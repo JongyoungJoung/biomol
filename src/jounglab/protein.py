@@ -141,12 +141,12 @@ class Protein:
                     self.seqres[chainid].append(line)
         return None
 
-    def split_into_individual_chains(self) -> None:
+    def extract_all_chains(self) -> None:
         name, ext = osp.splitext(self.pdbfile_path)
         io = PDBIO()
-        for c in self.pdb_model:
-            cid = c.id
-            io.set_structure(self.pdb_str)
+        io.set_structure(self.pdb_str)
+        for chainObj in self.pdb_model:
+            cid = chainObj.id
             chain_outfile = f"{name}{cid}.pdb"
             if len(self.seqres[cid]) != 0:
                 with open(chain_outfile, "w") as out_file:
@@ -156,6 +156,26 @@ class Protein:
                 io.save(out_file, select=ChainSelect(cid))
         return None
 
+    def extract_specific_chains(self, chains: str | list) -> None:
+        name, ext = osp.splitext(self.pdbfile_path)
+        io = PDBIO()
+        io.set_structure(self.pdb_str)
+        target_cids = "".join(chains)
+        chain_outfile = f"{name}{target_cids}.pdb"
+        if osp.exists(chain_outfile):
+            os.remove(chain_outfile)
+
+        for cid in target_cids:
+            chainObj = self.pdb_model[cid]
+            if len(self.seqres[cid]) != 0:
+                with open(chain_outfile, "a") as out_file:
+                    for record in self.seqres[cid]:
+                        out_file.write(record)
+            with open(chain_outfile, "a") as out_file:
+                io.save(out_file, select=ChainSelect(cid))
+        return None
+
+    # surface detection
     def detect_surface_residues(self, expose_cutoff: float = 0.01) -> None:
         # using "Rolling ball" algorithm by Sharke & Rupley
         # implemented in biopython
@@ -202,9 +222,9 @@ class Protein:
 
         return is_in_surface
 
-    # modifier function
-    # TODO using rotamer library,
-    def mutate(self, resid: int, mut_res: str, chid: str):
+    # Set mutation using rotamer library
+    #
+    def mutate(self, resid: int, chid: str, wt_res: str, mut_res: str) -> None:
         pass
 
 
