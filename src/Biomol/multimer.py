@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
-from jounglab import protein
-from jounglab.libs import pdbutil
+from Biomol import protein
+from Biomol.libs import pdbutil
 
 
 class Multimer(protein.Protein):
@@ -19,11 +17,11 @@ class Multimer(protein.Protein):
         cut: float = 5.0,
     ) -> None:
         #
-        if ch1 == None:
+        if ch1 is None:
             chain_list1 = self.get_chain_ids()
         else:
             chain_list1 = [ch1]
-        if ch2 == None:
+        if ch2 is None:
             chain_list2 = self.get_chain_ids()
         else:
             chain_list2 = [ch2]
@@ -45,8 +43,8 @@ class Multimer(protein.Protein):
                 self.interface_pairs[(c1, c2)] = pairs[:npairs]
 
     def check_residue_in_interface(
-        self, resid: int, reschid: str | None = None, verbose: bool = False
-    ) -> bool:
+        self, resid: int, reschid: str | None = None, verbose=False
+    ) -> tuple[bool, str]:
         # resid   : residue that you want to check its residence in the interface
         # reschid : residue's chain id if you know
         # verbose : show detail
@@ -54,7 +52,7 @@ class Multimer(protein.Protein):
             self.calc_interface_residues()
 
         check_all_interface = False
-        if reschid == None:
+        if reschid is None:
             if verbose:
                 print(f"WARNING: chain id for residue-{resid} is missed.")
                 print("Possible chain pairs below:")
@@ -70,7 +68,7 @@ class Multimer(protein.Protein):
         for chain_pair, interfaces in self.interface_pairs.items():
             if reschid in chain_pair or check_all_interface:
                 if resid in interfaces:
-                    if reschid != None:
+                    if reschid is not None:
                         # if reschid is specified, check whether resid is in "that" chain.
                         which_chain = chain_pair.index(reschid)
                         if resid in interfaces[:, which_chain]:

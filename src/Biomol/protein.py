@@ -1,11 +1,9 @@
-#!/usr/bin/env python
 import os
 import sys
 from os import path as osp
 
 import numpy as np
-from Bio.PDB import PDBIO
-from Bio.PDB.PDBIO import Select
+from Bio.PDB.PDBIO import PDBIO, Select
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 from tqdm import tqdm
@@ -24,8 +22,8 @@ class Protein:
         self,
         pdbfile_path: str,
         chid: str | None = None,
-        remove_wat: bool = True,
-        remove_het_only_chain: bool = True,
+        remove_wat: bool | None = True,
+        # remove_het_only_chain: bool | None = True,
     ):
         self.pdbfile_path = pdbfile_path
         self.residues = {}
@@ -56,8 +54,8 @@ class Protein:
 
         self.pdb_model = self.pdb_str[0]
 
-        if chid != None:
-            self.residues[chid] = pdb_model[chid]
+        if chid is not None:
+            self.residues[chid] = self.pdb_model[chid]
         else:
             for chain in self.pdb_model:
                 this_chid = chain.get_id()
@@ -103,12 +101,12 @@ class Protein:
 
     def get_crds_list(self, given_chid: str | list | None = None) -> list:
         crdlist = []
-        if given_chid != None:
+        if given_chid is not None:
             given_chid = Protein.util_upper_chainIds(given_chid)
 
         # res: Biopython.PDB.Residue
         for chid, reslist in self.residues.items():
-            if given_chid != None and chid.upper() not in given_chid:
+            if given_chid is not None and chid.upper() not in given_chid:
                 continue
             for res in reslist:
                 for atm in res:
@@ -117,11 +115,11 @@ class Protein:
 
     def get_crds_list_with_resid(self, given_chid: str | list | None = None) -> list:
         crdlist = []
-        if given_chid != None:
+        if given_chid is not None:
             given_chid = Protein.util_upper_chainIds(given_chid)
 
         for chid, reslist in self.residues.items():
-            if given_chid != None and chid.upper() not in given_chid:
+            if given_chid is not None and chid.upper() not in given_chid:
                 continue
             for res in reslist:
                 for atm in res:
@@ -132,21 +130,20 @@ class Protein:
         return crdlist
 
     def extract_seqres_records(self) -> None:
-        with open(self.pdbfile_path, "r") as pdbfile:
+        with open(self.pdbfile_path) as pdbfile:
             for line in pdbfile:
                 if line.startswith("SEQRES"):
                     chainid = line[11]
                     if chainid not in self.seqres:
                         self.seqres[chainid] = []
                     self.seqres[chainid].append(line)
-        return None
 
     def extract_all_chains(self) -> None:
         name, ext = osp.splitext(self.pdbfile_path)
         io = PDBIO()
         io.set_structure(self.pdb_str)
-        for chainObj in self.pdb_model:
-            cid = chainObj.id
+        for chain_obj in self.pdb_model:
+            cid = chain_obj.id
             chain_outfile = f"{name}{cid}.pdb"
             if len(self.seqres[cid]) != 0:
                 with open(chain_outfile, "w") as out_file:
@@ -166,14 +163,13 @@ class Protein:
             os.remove(chain_outfile)
 
         for cid in target_cids:
-            chainObj = self.pdb_model[cid]
+            chain_obj = self.pdb_model[cid]
             if len(self.seqres[cid]) != 0:
                 with open(chain_outfile, "a") as out_file:
                     for record in self.seqres[cid]:
                         out_file.write(record)
             with open(chain_outfile, "a") as out_file:
                 io.save(out_file, select=ChainSelect(cid))
-        return None
 
     # surface detection
     def detect_surface_residues(self, expose_cutoff: float = 0.01) -> None:
@@ -205,13 +201,12 @@ class Protein:
                 self.exposed_sasa_ratio[chain.id][residue.id] = sasa_ratio
                 if sasa_ratio >= expose_cutoff:
                     self.detected_surface_residues[chain.id].append(residue.id[1])
-        return None
 
     def check_residue_in_surface(self, rid: int, reschid: str | None = None) -> bool:
         is_in_surface = False
         if len(self.exposed_sasa_ratio) == 0:
             self.detect_surface_residues()
-        if reschid != None:
+        if reschid is not None:
             chains = [reschid]
         else:
             chains = self.get_chain_ids()
@@ -232,4 +227,4 @@ if __name__ == "__main__":
     pdbfile = "1acbE.pdb"
     protein = Protein(pdbfile)
 
-    print(f"Number of residue: {protein.get_residue_list()}")
+    print(f"Number of residue: {protein.get_residues()}")

@@ -5,37 +5,43 @@ build-backend = "setuptools.build_meta"
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "src/jounglab/_version.py"
-versionfile_build = "jounglab/_version.py"
+versionfile_source = "src/Biomol/_version.py"
+versionfile_build = "Biomol/_version.py"
 tag_prefix = "v"
-parentdir_predic = "jounglab-"
+parentdir_predic = "biomolecule-"
 
 [project]
-name = "jounglab"
+name = "biomolecule"
+dynamics = ["version", "dependencies", "optional-dependencies"]
 version = "0.0.1"
 authors = [
   { name="Jongyoung Joung", email="jongyoungjoung@gmail.com" },
 ]
 description = "Frequently used core modules that would be the base modules for advanced functions"
 readme = "README.md"
-requires-python = ">=3.8"
+license = { file = "LICENSE" }
+requires-python = ">=3.10,<4"
 classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
+    #"Programming Language :: Python :: 3.8",
+    #"Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 keywords = ["development", "template"]
 
 [project.urls]
-Homepage = "https://github.com/JongyoungJoung/jounglab"
-Issues = "https://github.com/JongyoungJoung/jounglab/issues"
+#Homepage = "https://github.com/JongyoungJoung/jounglab"
+#Issues = "https://github.com/JongyoungJoung/jounglab/issues"
+Homepage = "https://github.com/deargen/Biomolecule-As-Basis-For-Modeling"
+
+[project.scripts]
+biomolecule = "Biomol.cli:main"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["deps/requirements.in"]}
@@ -44,13 +50,13 @@ dependencies = {file = ["deps/requirements.in"]}
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=jounglab"
+addopts = "--cov=Biomol"
 testpaths = ["tests"]
 
 [tool.ruff]
 namespace-packages = ["tools", "scripts", "tests"]  # for INP rule, suppress on these directories
 extend-exclude = [
-  "src/jounglab/_version.py",  # CHANGE
+  "src/Biomol/_version.py",  # CHANGE
 ]
 
 [tool.ruff.lint]
@@ -153,12 +159,20 @@ known-first-party = [
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "pytorch_lightning".msg = "Use lightning.fabric instead"
 "lightning.pytorch".msg = "Use lightning.fabric instead"
+"lightning.fabric".msg = "Use lightning.fabric instead"
 "accelerate".msg = "Use lightning.fabric instead"
+"os.system".msg = "Use subprocess.run or subprocess.Popen instead"
+"easydict".msg = "Use typing.TypedDict instead (also consider dataclasses and pydantic)"
 
 [tool.ruff.lint.pylint]
 max-args = 10
 max-bool-expr = 10
 max-statements = 100
+max-returns = 10
+max-public-methods = 30
+max-nested-blocks = 10
+max-locals = 30
+max-branches = 24
 
 [tool.pyright]
 include = ["src"]
@@ -171,6 +185,6 @@ pythonVersion = "3.10"
 
 [tool.coverage.report]
 omit = [
-  "src/jounglab/_version.py",
+  "src/Biomol/_version.py",
   # OPTIONALLY ADD MORE LATER
 ]
