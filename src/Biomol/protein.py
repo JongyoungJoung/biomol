@@ -1,11 +1,13 @@
 import os
 import sys
 from os import path as osp
+from pathlib import Path
 
 import numpy as np
 from Bio.PDB.PDBIO import PDBIO, Select
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.SASA import ShrakeRupley
+from rotamer import init_rotamer
 from tqdm import tqdm
 
 
@@ -77,7 +79,7 @@ class Protein:
     def check_pdb_file(file_path) -> None:
         assert isinstance(file_path, str), "File path must be a string"
         assert file_path.endswith(".pdb"), "File must have .pdb extension"
-        assert os.path.isfile(file_path), f"{file_path} is not a valid file"
+        assert Path(file_path).is_file(), f"{file_path} is not a valid file"
 
     @staticmethod
     def util_upper_chainIds(chids: str | list):
@@ -139,7 +141,9 @@ class Protein:
                     self.seqres[chainid].append(line)
 
     def extract_all_chains(self) -> None:
-        name, ext = osp.splitext(self.pdbfile_path)
+        # name, ext = osp.splitext(self.pdbfile_path)
+        name = Path(self.pdbfile_path).stem
+
         io = PDBIO()
         io.set_structure(self.pdb_str)
         for chain_obj in self.pdb_model:
@@ -151,16 +155,16 @@ class Protein:
                         out_file.write(record)
             with open(chain_outfile, "a") as out_file:
                 io.save(out_file, select=ChainSelect(cid))
-        return None
 
     def extract_specific_chains(self, chains: str | list) -> None:
-        name, ext = osp.splitext(self.pdbfile_path)
+        # name, ext = osp.splitext(self.pdbfile_path)
+        name = Path(self.pdbfile_path).stem
         io = PDBIO()
         io.set_structure(self.pdb_str)
         target_cids = "".join(chains)
         chain_outfile = f"{name}{target_cids}.pdb"
-        if osp.exists(chain_outfile):
-            os.remove(chain_outfile)
+        if Path(chain_outfile).exists():
+            Path(chain_outfile).unlink()
 
         for cid in target_cids:
             chain_obj = self.pdb_model[cid]
