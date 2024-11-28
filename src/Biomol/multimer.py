@@ -27,13 +27,13 @@ class Multimer(protein.Protein):
             chain_list2 = [ch2]
 
         for c1 in chain_list1:
-            chain1_crd = self.get_crds_list_with_resid(given_chid=c1)
+            chain1_crd = self.get_atom_crds_and_their_resids(chainid=c1)
             for c2 in chain_list2:
                 if c1 == c2:
                     continue
                 if (c2, c1) in self.interface_pairs:
                     continue
-                chain2_crd = self.get_crds_list_with_resid(given_chid=c2)
+                chain2_crd = self.get_atom_crds_and_their_resids(chainid=c2)
 
                 pairs, npairs = pdbutil.get_interface_residues(
                     chain1_crd, chain2_crd, cut, len(chain1_crd), len(chain2_crd)
