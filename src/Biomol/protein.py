@@ -361,8 +361,10 @@ class Protein:
             self.rotamer_library, mut_res, phi, psi, sort_by="Probabil", rank=0
         )
 
-        mutres_int_coord = coordinate.construct_residue_internal_coord(
-            resname=mut_res, forcefield_topology=self.topology
+        mutres_int_coord = (
+            coordinate.construct_residue_internal_coord_from_Amber_topology(
+                resname=mut_res, forcefield_topology=self.topology
+            )
         )
 
 
