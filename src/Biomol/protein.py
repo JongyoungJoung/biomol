@@ -1,22 +1,14 @@
-# import os
-# import sys
-from os import path as osp
 from pathlib import Path
+from typing import Literal
 
-import numpy as np
 import pandas as pd
-from Bio.PDB import Atom, Residue
+from Bio.PDB import Residue
 from Bio.PDB.PDBIO import PDBIO, Select
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.SASA import ShrakeRupley
-from rotamer import (
-    calc_dihedral_angle,
-    # get_dihedral_angle_atom_composition,
-    get_sidechain_rotamers,
-    load_rotamer_library,
-)
 
-# from tqdm import tqdm
+from biomol import coordinate, rotamer
+from biomol.topology import AmberTopology
 
 
 class ChainSelect(Select):
@@ -40,7 +32,10 @@ class Protein:
         self,
         pdbfile_path: str,
         chid: str | None = None,
+        *,
         remove_wat: bool | None = True,
+        load_ff: bool | None = False,
+        ff_type: Literal["ff99SB", "ff12SB", "ff14SB", "ff19SB"] = "ff19SB",
         # remove_het_only_chain: bool | None = True,
     ):
         self.pdbfile_path = pdbfile_path
@@ -50,9 +45,12 @@ class Protein:
         self.detected_surface_residues = {}
         self.seqres = {}
         self.rotamer_library = pd.DataFrame()
+        # force field related.
+        self.forcefield_loaded = False
+        self.forcefield_type = ff_type
+        self.topology: AmberTopology
 
         Protein.check_pdb_file(self.pdbfile_path)
-        # pdb_parser = PDBParser(PERMISSIVE=1)
         pdb_parser = PDBParser(QUIET=True)
 
         self.pdb_str = pdb_parser.get_structure("input_protein", self.pdbfile_path)
@@ -87,6 +85,10 @@ class Protein:
 
         # parser SEQRES parts
         self.extract_seqres_records()
+
+        # Loading force field
+        if load_ff:
+            self.init_forcefield()
 
     @staticmethod
     def check_pdb_file(file_path) -> None:
@@ -254,7 +256,21 @@ class Protein:
         """
         Read rotamer library file and load it in pd.Dataframe.
         """
-        self.rotamer_library = load_rotamer_library()
+        self.rotamer_library = rotamer.load_rotamer_library()
+
+    def init_forcefield(self):
+        """
+        Load force field related informations.
+
+        - Reading topology (amino aicds') files
+        - Reading force field parameters (TODO)
+        """
+        if not self.forcefield_loaded:
+            self.topology = AmberTopology()
+            # TODO:
+            #    loading force field parameters..
+
+            self.forcefield_loaded = True
 
     def calc_dihedral_angle_of_residue_with_given_type(
         self, dihedral_type: str, resid: int, chainid: str | None = None
@@ -298,7 +314,7 @@ class Protein:
             if dihedral_type.upper() in ["PSI", "OMEGA"]:
                 next_res = resid2resobj_dict[resid + 1]
 
-        dihedral = calc_dihedral_angle(
+        dihedral = rotamer.calc_dihedral_angle(
             resid2resobj_dict[resid],
             dihedral_type,
             resname,
@@ -309,7 +325,7 @@ class Protein:
         )
         return dihedral
 
-    def mutate(self, resid: int, chid: str, wt_res: str, mut_res: str) -> None:
+    def mutate(self, *, resid: int, chid: str, wt_res: str, mut_res: str) -> None:
         """
         Set mutation on a specific residue.
 
@@ -330,6 +346,8 @@ class Protein:
         # Is it good way to have rotamer library as instance variable??
         if self.rotamer_library.size == 0:
             self.init_rotamer_library()
+        if not self.forcefield_loaded:
+            self.init_forcefield()
 
         # Step-2.
         phi = self.calc_dihedral_angle_of_residue_with_given_type(
@@ -339,8 +357,12 @@ class Protein:
             dihedral_type="psi", resid=resid, chainid=chid
         )
         # Step-3.
-        sidechain_rotamers = get_sidechain_rotamers(
+        sidechain_rotamers = rotamer.get_sidechain_rotamers(
             self.rotamer_library, mut_res, phi, psi, sort_by="Probabil", rank=0
+        )
+
+        mutres_int_coord = coordinate.construct_residue_internal_coord(
+            resname=mut_res, forcefield_topology=self.topology
         )
 
 

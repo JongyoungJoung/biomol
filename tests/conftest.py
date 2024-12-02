@@ -1,6 +1,6 @@
 import pytest
 
-from Biomol.two_numbers import TwoNumbers
+from biomol.two_numbers import TwoNumbers
 
 
 @pytest.fixture(scope="session")

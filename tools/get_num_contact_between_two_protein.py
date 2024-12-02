@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import argparse
-import sys
-import time
 
-from tqdm import tqdm
+# import sys
+# import time
+import numpy as np
 
-from jounglab import protein
-from jounglab.libs import pdbutil
+# from tqdm import tqdm
+from biomol import protein
+from biomol.libs import pdbutil
 
 
 def get_args():
@@ -33,8 +34,8 @@ def show_residue_residue_contacts(args):
     protein1 = protein.Protein(args.pdbfile1)
     protein2 = protein.Protein(args.pdbfile2)
 
-    pro1crd = protein1.get_crds_list_with_resid()
-    pro2crd = protein2.get_crds_list_with_resid()
+    pro1crd = protein1.get_atom_crds_and_their_resids()
+    pro2crd = protein2.get_atom_crds_and_their_resids()
 
     pairs, npair = pdbutil.get_interface_residues(
         pro1crd, pro2crd, args.distance_cutoff, len(pro1crd), len(pro2crd)
@@ -47,14 +48,14 @@ def show_residue_residue_contacts(args):
         if args.verbose:
             print(f"Distance cutoff: {args.distance_cutoff:.1f}")
             print(
-                f"Contacted res of chain-1: {' '.join(np.unique(pairs[:npair,0])).astype(str)}"
+                f"Contacted res of chain-1: {' '.join(np.unique(pairs[:npair,0]).astype(str))}"
             )
             print(
-                f"Contacted res of chain-2: {' '.join(np.unique(pairs[:npair,1])).astype(str)}"
+                f"Contacted res of chain-2: {' '.join(np.unique(pairs[:npair,1]).astype(str))}"
             )
         else:
-            print(" ".join(np.unique(pairs[:npair, 0])).astype(str))
-            print(" ".join(np.unique(pairs[:npair, 1])).astype(str))
+            print(" ".join(np.unique(pairs[:npair, 0]).astype(str)))
+            print(" ".join(np.unique(pairs[:npair, 1]).astype(str)))
 
 
 if __name__ == "__main__":

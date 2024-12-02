@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -131,7 +130,7 @@ def get_sidechain_rotamers(
     rotamers = [0.0, 0.0, 0.0, 0.0]
     phi_key = round(phi, -1)
     psi_key = round(psi, -1)
-    possible_rotamers = rotamer_lib[
+    possible_rotamers: pd.DataFrame = rotamer_lib[  # type: ignore
         (rotamer_lib["Residue"] == resname)
         & (rotamer_lib["Phi"] == phi_key)
         & (rotamer_lib["Psi"] == psi_key)
@@ -178,6 +177,7 @@ def get_atom_with_specific_position_in_sidechain(
 def get_dihedral_angle_atom_composition(
     dihedral_angle_type: str,
     residue_name: str,
+    *,
     n_terminal=False,
     c_terminal=False,
 ):
@@ -213,11 +213,12 @@ def calc_dihedral_angle(
     residue_name: str,
     prev_residue_obj: Residue.Residue | None = None,
     next_residue_obj: Residue.Residue | None = None,
+    *,
     n_terminal=False,
     c_terminal=False,
 ):
     at1name, at2name, at3name, at4name = get_dihedral_angle_atom_composition(
-        dihedral_angle_type, residue_name, n_terminal, c_terminal
+        dihedral_angle_type, residue_name, n_terminal=n_terminal, c_terminal=c_terminal
     )
     assert isinstance(
         at1name, str

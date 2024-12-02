@@ -40,7 +40,7 @@ rich.traceback.install(show_locals=True)
 
 import logging
 
-from Biomol.utils import setup_logging
+from biomol.utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
 본 template에서는 logging을 쉽게 설정할 수 있는 함수를 제공합니다.
 
-### ::: Biomol.utils.setup_logging
+### ::: biomol.utils.setup_logging
     options:
         show_root_heading: true
 

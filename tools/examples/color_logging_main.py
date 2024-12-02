@@ -9,7 +9,7 @@ load_dotenv()
 
 import logging
 
-from Biomol.utils import setup_logging
+from biomol import LOG_DIR, setup_logging
 
 logger = logging.getLogger(__name__)
 

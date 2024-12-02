@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [tool.versioneer]
 VCS = "git"
 style = "pep440"
-versionfile_source = "src/Biomol/_version.py"
-versionfile_build = "Biomol/_version.py"
+versionfile_source = "src/biomol/_version.py"
+versionfile_build = "biomol/_version.py"
 tag_prefix = "v"
-parentdir_predic = "biomolecule-"
+parentdir_predic = "biomol-"
 
 [project]
-name = "biomolecule"
+name = "biomol"
 dynamics = ["version", "dependencies", "optional-dependencies"]
 version = "0.0.1"
 authors = [
@@ -41,7 +41,7 @@ keywords = ["development", "template"]
 Homepage = "https://github.com/deargen/Biomolecule-As-Basis-For-Modeling"
 
 [project.scripts]
-biomolecule = "Biomol.cli:main"
+biomol = "biomol.cli:main"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["deps/requirements.in"]}
@@ -50,13 +50,13 @@ dependencies = {file = ["deps/requirements.in"]}
 where = ["src"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=Biomol"
+addopts = "--cov=biomol"
 testpaths = ["tests"]
 
 [tool.ruff]
 namespace-packages = ["tools", "scripts", "tests"]  # for INP rule, suppress on these directories
 extend-exclude = [
-  "src/Biomol/_version.py",  # CHANGE
+  "src/biomol/_version.py",  # CHANGE
 ]
 
 [tool.ruff.lint]
@@ -185,6 +185,6 @@ pythonVersion = "3.10"
 
 [tool.coverage.report]
 omit = [
-  "src/Biomol/_version.py",
+  "src/biomol/_version.py",
   # OPTIONALLY ADD MORE LATER
 ]

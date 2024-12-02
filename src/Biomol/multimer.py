@@ -1,5 +1,5 @@
-from Biomol import protein
-from Biomol.libs import pdbutil
+from biomol import protein
+from biomol.libs import pdbutil
 
 
 class Multimer(protein.Protein):
@@ -16,7 +16,6 @@ class Multimer(protein.Protein):
         ch2: str | None = None,
         cut: float = 5.0,
     ) -> None:
-        #
         if ch1 is None:
             chain_list1 = self.get_chain_ids()
         else:
@@ -43,7 +42,7 @@ class Multimer(protein.Protein):
                 self.interface_pairs[(c1, c2)] = pairs[:npairs]
 
     def check_residue_in_interface(
-        self, resid: int, reschid: str | None = None, verbose=False
+        self, resid: int, *, reschid: str | None = None, verbose=False
     ) -> tuple[bool, str]:
         # resid   : residue that you want to check its residence in the interface
         # reschid : residue's chain id if you know
@@ -66,30 +65,28 @@ class Multimer(protein.Protein):
         is_in_interface = False
         locate_chain_pairs = ""
         for chain_pair, interfaces in self.interface_pairs.items():
-            if reschid in chain_pair or check_all_interface:
-                if resid in interfaces:
-                    if reschid is not None:
-                        # if reschid is specified, check whether resid is in "that" chain.
-                        which_chain = chain_pair.index(reschid)
-                        if resid in interfaces[:, which_chain]:
-                            is_in_interface = True
-                    else:
-                        # if not specified, just check resid is found in the interface region
-                        if resid in interfaces:
-                            is_in_interface = True
-                    if is_in_interface:
-                        # accumulate chain_pairs for return
-                        if len(locate_chain_pairs) != 0:
-                            locate_chain_pairs += ","
-                        locate_chain_pairs += "".join(chain_pair)
+            if (reschid in chain_pair or check_all_interface) and resid in interfaces:
+                if reschid is not None:
+                    # if reschid is specified, check whether resid is in "that" chain.
+                    which_chain = chain_pair.index(reschid)
+                    if resid in interfaces[:, which_chain]:
+                        is_in_interface = True
+                elif resid in interfaces:
+                    # if not specified, just check resid is found in the interface region
+                    is_in_interface = True
 
-                    if verbose:
-                        if is_in_interface:
-                            print(
-                                f"res-{resid} in interface of pairs: {chain_pair[0]}-{chain_pair[1]}"
-                            )
-                    if not check_all_interface:
-                        break
+                if is_in_interface:
+                    # accumulate chain_pairs for return
+                    if len(locate_chain_pairs) != 0:
+                        locate_chain_pairs += ","
+                    locate_chain_pairs += "".join(chain_pair)
+
+                if is_in_interface and verbose:
+                    print(
+                        f"res-{resid} in interface of pairs: {chain_pair[0]}-{chain_pair[1]}"
+                    )
+                if not check_all_interface:
+                    break
             is_in_interface = False
         if len(locate_chain_pairs) != 0:
             is_in_interface = True

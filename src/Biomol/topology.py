@@ -1,375 +1,94 @@
 #
 # NOTE: Reference Framework of Protein Amino Acids' Topology
 #
-
-# NOTE: Atom compositions of amino acids
+#       self.AA_ATOMS: Atom compositions of amino acids
 #       reference 1) Amber topologoy data $AMBERHOME/dat/leap/lib/amino19.lib
 #       reference 2) Page 27 in "https://cdn.rcsb.org/wwpdb/docs/documentation/file-format/PDB_format_1992.pdf"
 #       The order of atoms follows that of amber force field library.
+#
+#       self.AA_CONNECT: Atom connectivity of amino acids
+#       "Residue name" : [(atom_i_idx, atom_j_idx)]
+#       atom index starts from 1 (first atom defined in topology dictionary)
+#       reference: $AMBERHOME/dat/leap/lib/amino19.lib
+#                  "!entry.XXX.unit.connectivity" in the library file
+import os
+import re
+from pathlib import Path
+from typing import Literal
 
-AA_ATOMS = {
-    "ALA": ["N", "H", "CA", "HA", "CB", "HB1", "HB2", "HB3", "C", "O"],
-    "ARG": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB1",
-        "HB2",
-        "CG",
-        "HG2",
-        "HG3",
-        "CD",
-        "HD2",
-        "HD3",
-        "NE",
-        "HE",
-        "CZ",
-        "NH1",
-        "HH11",
-        "HH12",
-        "NH2",
-        "HH21",
-        "HH22",
-        "C",
-        "O",
-    ],
-    "ASN": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "OD1",
-        "ND2",
-        "HD21",
-        "HD22",
-        "C",
-        "O",
-    ],
-    "ASP": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "CG", "OD1", "OD2", "C", "O"],
-    "CYS": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "SG", "HG", "C", "O"],
-    "GLN": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "HG2",
-        "HG3",
-        "CD",
-        "OE1",
-        "NE2",
-        "C",
-        "O",
-    ],
-    "GLU": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "HG2",
-        "HG3",
-        "CD",
-        "OE1",
-        "OE2",
-        "C",
-        "O",
-    ],
-    "GLY": ["N", "H", "CA", "HA", "C", "O"],
-    "HID": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "ND1",
-        "HD1",
-        "CE1",
-        "HE1",
-        "NE2",
-        "CD2",
-        "HD2",
-        "C",
-        "O",
-    ],
-    "HIE": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "ND1",
-        "CE1",
-        "HE1",
-        "NE2",
-        "HE2",
-        "CD2",
-        "HD2",
-        "C",
-        "O",
-    ],
-    "HIP": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "ND1",
-        "HD1",
-        "CE1",
-        "HE1",
-        "NE2",
-        "HE2",
-        "CD2",
-        "HD2",
-        "C",
-        "O",
-    ],
-    "ILE": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB",
-        "CG2",
-        "HG21",
-        "HG22",
-        "HG23",
-        "CG1",
-        "HG11",
-        "HG12",
-        "HG13",
-        "CD1",
-        "HD11",
-        "HD12",
-        "HD13",
-        "C",
-        "O",
-    ],
-    "LEU": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "HG",
-        "CD1",
-        "HD11",
-        "HD12",
-        "HD13",
-        "CD2",
-        "HD21",
-        "HD22",
-        "HD23",
-        "C",
-        "O",
-    ],
-    "LYS": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "HG2",
-        "HG3",
-        "CD",
-        "HD2",
-        "HD3",
-        "CE",
-        "HE2",
-        "HE3",
-        "NZ",
-        "HZ1",
-        "HZ2",
-        "HZ3",
-        "C",
-        "O",
-    ],
-    "MET": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "HG2",
-        "HG3",
-        "SD",
-        "CE",
-        "HE1",
-        "HE2",
-        "HE3",
-        "C",
-        "O",
-    ],
-    "PHE": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "CD1",
-        "HD1",
-        "CE1",
-        "HE1",
-        "CZ",
-        "HZ",
-        "CE2",
-        "HE2",
-        "CD2",
-        "HD2",
-        "C",
-        "O",
-    ],
-    "PRO": [
-        "N",
-        "CD",
-        "HD2",
-        "HD3",
-        "CG",
-        "HG2",
-        "HG3",
-        "CB",
-        "HB2",
-        "HB3",
-        "CA",
-        "HA",
-        "C",
-        "O",
-    ],
-    "SER": ["N", "H", "CA", "HA", "CB", "HB2", "HB3", "OG", "HG", "C", "O"],
-    "THR": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG2",
-        "HG21",
-        "HG22",
-        "HG23",
-        "OG1",
-        "HG1",
-        "C",
-        "O",
-    ],
-    "TRP": [
-        "N",
-        "CA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "CD1",
-        "HD1",
-        "NE1",
-        "HE1",
-        "CE2",
-        "CZ2",
-        "HZ2",
-        "CH2",
-        "HH2",
-        "CZ3",
-        "HZ3",
-        "CE3",
-        "HE3",
-        "CD2",
-        "C",
-        "O",
-    ],
-    "TYR": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB2",
-        "HB3",
-        "CG",
-        "CD1",
-        "HD1",
-        "CD2",
-        "CE1",
-        "CE2",
-        "CZ",
-        "OH",
-        "C",
-        "O",
-    ],
-    "VAL": [
-        "N",
-        "H",
-        "CA",
-        "HA",
-        "CB",
-        "HB",
-        "CG1",
-        "HG11",
-        "HG12",
-        "HG13",
-        "CG2",
-        "HG21",
-        "HG22",
-        "HG23",
-        "C",
-        "O",
-    ],
-}
 
-CONNECT = {
-    "ALA": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "ARG": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "ASN": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "ASP": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "CYS": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "GLU": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "GLN": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "GLY": [("N", "CA"), ("CA", "C"), ("C", "O")],
-    # "HIS": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "ILE": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "LEU": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "LYS": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "MET": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "PHE": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "PRO": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "SER": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "THR": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "TRP": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "TYR": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-    # "VAL": [("N", "CA"), ("CA", "C"), ("C", "O"), ("CA", "CB")],
-}
+class AmberTopology:
+    def __init__(
+        self,
+        fftype: Literal["ff99SB", "ff12SB", "ff14SB", "ff19SB"] = "ff19SB",
+    ):
+        assert "AMBERHOME" in os.environ, self.report_error()
+        self.AA_ATOMS = {}
+        self.AA_CONNECT = {}
+
+        # TODO: change this for alternative options of force field. e.g ff14SB, ff19SB, etc
+        self.forcefield_type = fftype
+        libfile = AmberTopology.match_forcefield_libfile(self.forcefield_type)
+        self.forcefield_libfile = f"{os.environ('AMBERHOME')}/dat/leap/lib/{libfile}"
+        assert Path(
+            self.forcefield_libfile
+        ).exists, "Forcefield library file doest not exist."
+
+        self.parse_ff_library()
+
+    @staticmethod
+    def match_forcefield_libfile(ff_type: str) -> str | os.PathLike:
+        libfiles = {
+            "ff99SB": "oldff/all_amino91.lib",
+            "ff12SB": "amino12.lib",
+            "ff14SB": "amino14ipq.lib",
+            "ff19SB": "amino19.lib",
+        }
+
+        return libfiles[ff_type]
+
+    def parse_ff_library(self):
+        """
+        Parse Amber forcefield library file which defines topology of amino acids.
+        """
+        new_amino_acid = False
+        connectivity = False
+        resname = ""
+        atomname = ""
+        with open(self.forcefield_libfile) as libfile:
+            for line in libfile:
+                if re.match(line.split()[0], r"!entry\.\w{3}\.unit\.atomspertinfo"):
+                    new_amino_acid = True
+                    resname = line.split()[0].split(".")[1]
+                    self.AA_ATOMS[resname] = []
+                    continue
+                elif re.match(line.split()[0], r"!entry\.\w{3}\.unit\.boundbox"):
+                    new_amino_acid = False
+                    continue
+                elif re.match(line.split()[0], r"!entry\.\w{3}\.unit\.connectivity"):
+                    resname = line.split()[0].split(".")[1]
+                    self.AA_CONNECT[resname] = []
+                    connectivity = True
+                    continue
+                elif re.match(line.split()[0], r"!entry\.\w{3}\.unit\.hierarchy"):
+                    connectivity = False
+                    continue
+
+                if new_amino_acid:
+                    atomname = line.split()[0].strip('"')
+                    self.AA_ATOMS[resname].append(atomname)
+                if connectivity:
+                    iatom, jatom = [int(ele) for ele in line.split()][:2]
+                    self.AA_CONNECT[resname].append((iatom, jatom))
+
+    # @classmethod
+    # def setup_internal_coord(cls, ...
+
+    def report_error(self):
+        print("ERROR: Environment variable $AMBERHOME is not defined.")
+        print("Please Checke that AmberTools and/or AmberXX should be installed and ..")
+        print("       amber.sh was sourced in .zshrc")
+
+
+if __name__ == "__main__":
+    top = AmberTopology()

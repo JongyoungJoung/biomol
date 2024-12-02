@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.theme import Theme
 
-from Biomol import LOG_DIR, PROJECT_DIR, __version__, default_log_level
+from biomol import LOG_DIR, PROJECT_DIR, __version__, default_log_level
 
 # 옵션으로 `from accelerate.logging import get_logger`
 # 사용하시면 로깅할 때 main_process_only=False, in_order=True 등 옵션 사용 가능합니다.
@@ -51,7 +51,7 @@ def setup_logging(
         file_levels
     ), "output_files and file_levels must have the same length"
 
-    # NOTE Initialise with NOTSET level and null device, and add stream handler separately.
+    # NOTE: Initialise with NOTSET level and null device, and add stream handler separately.
     # This way, the root logging level is NOTSET (log all), and we can customise each handler's behaviour.
     # If we set the level during the initialisation, it will affect to ALL streams,
     # so the file stream cannot be more verbose (lower level) than the console stream.

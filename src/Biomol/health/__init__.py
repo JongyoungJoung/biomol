@@ -3,7 +3,7 @@
 import logging
 import os
 
-from Biomol import DATA_DIR
+from biomol import DATA_DIR
 
 logger = logging.getLogger(__name__)
 

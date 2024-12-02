@@ -38,7 +38,7 @@
 7. `uv pip install -r deps/lock/x86_64-manylinux_2_28/requirements_dev.txt` 으로 pytest 등 개발자용 패키지도 설치가능
 8. `pytest` 커맨드로 테스트 실행해보기.
     - doctest는 Actions에서 자동으로 실행됨.
-9. `import Biomol; print(Biomol.__version__)` 해보면 `0.1.0+4.g75bbed7.dirty` 이런식으로 나옴.  
+9. `import biomol; print(biomol.__version__)` 해보면 `0.1.0+4.g75bbed7.dirty` 이런식으로 나옴.  
     - 0.1.0 버전 이후 4개의 커밋이란 뜻. 그리고 커밋되지 않은 수정사항이 있는 상태이면 dirty버전임.
 
 ## 파일 설명
@@ -53,7 +53,7 @@
   └ 📄 *.yml
 
 📂 src/
-└ 📂 Biomol/             # `import Biomol`해서 사용하는 함수나 클래스 등 정의하는 곳
+└ 📂 biomol/             # `import biomol`해서 사용하는 함수나 클래스 등 정의하는 곳
   │ 🐍 __init__.py
   │ 🐍 _version.py          # git tag로 버전 정보를 읽는 versioneer 파일 (수정X)
   └ 🐍 ...
@@ -94,7 +94,7 @@
 
 프로젝트 이름 바꾸기 위해 `./replace_project_name.sh` 내용을 수정 후 실행합니다. 스크립트에서 아래 내용을 해결해줍니다.
 
-1. `src/Biomol` 폴더 이름 원하는 걸로 바꾸기 (`import Biomol` 할 때 이름)
+1. `src/biomol` 폴더 이름 원하는 걸로 바꾸기 (`import biomol` 할 때 이름)
 2. `pyproject.toml`에 바꿔야하는 부분 주석 되어있음. 바꿔 쓰기
 3. `README.md`에 있는 badge들 URL (Biomolecule-As-Basis-For-PP-PL-Modeling -> 새 주소) 바꾸어 주어야 제대로 테스트 결과가 뜸.
 

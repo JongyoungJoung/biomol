@@ -11,9 +11,9 @@
 - [**Versioneer**](https://github.com/python-versioneer/python-versioneer): 버전 정보를 git tag에서 읽어와 python project versioning
 
 ```python hl_lines="3"
-import Biomol
+import biomol
 
-print(Biomol.__version__)
+print(biomol.__version__)
 ```
 
 ```title="out"
@@ -27,7 +27,7 @@ print(Biomol.__version__)
 
 ## 설치
 
-1. `src/Biomol/__init__.py`, `src/Biomol/_version.py` 가져다 쓰기
+1. `src/biomol/__init__.py`, `src/biomol/_version.py` 가져다 쓰기
 2. `pyproject.toml`에 versioneer 관련 섹션 가져다 쓰기
 
 ## 비슷한 툴
