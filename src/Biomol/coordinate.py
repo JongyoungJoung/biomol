@@ -3,7 +3,7 @@ from typing import TypedDict
 import numpy as np
 
 from biomol.rotamer import DIHEDRAL_MAP
-from biomol.topology import AmberTopology
+from biomol.topology import AmberParameter, AmberTopology
 
 
 class IntCoord(TypedDict):
@@ -17,24 +17,38 @@ class IntCoord(TypedDict):
 
 
 def construct_residue_internal_coord_of_sidechain_from_Amber_topology(  # noqa: N802
-    *, resname: str, forcefield_topology: AmberTopology
+    *,
+    resname: str,
+    forcefield_topology: AmberTopology,
+    forcefield_parameter: AmberParameter,
 ) -> dict[str, IntCoord]:
     ff_top = forcefield_topology
     res_atoms = ff_top.AA_ATOMS[resname]
     res_atoms_connect = ff_top.AA_CONNECT[resname]
-    zmatrix = build_connectivity(
+
+    zmatrix = build_connectivity_for_internal_coordinate(
         resname=resname, atoms_list=res_atoms, atoms_connect=res_atoms_connect
     )
+    zmatrix = initialize_geometric_values(zmatrix)
 
     return zmatrix
 
 
-def build_connectivity(
+def initialize_geometric_values(zmatrix) -> dict[str, IntCoord]:
+    return zmatrix
+
+
+def build_connectivity_for_internal_coordinate(
     *, resname: str, atoms_list: list[str], atoms_connect: list[tuple[int, int]]
 ) -> dict[str, IntCoord]:
     """
     Build atom connectivity in internal coordinates based on Amber forcefield library and rotamer dihedral map.
 
+    # Input
+    atoms_list : atom name list of a residue
+    atoms_connect : list of atom id pairs (tuple: (i_atom, j_atom))
+
+    # Output
     zmatrix: synonym of internal coordinate.
     format: this_atom_id bond_atm_id distance angle_atm_id angle dihedral_atm_id dihedral_angle
     example:
@@ -64,9 +78,12 @@ def build_connectivity(
     "HB2"   7   5       1.5     3       120.0   1           120.0
     "HB3"   8   5       1.5     3       120.0   1           180.0
 
-    # implicit rule
-    1. backbone atoms (N or C) assinged as backbone H's dihedral atom
-    2. for side-chain H atoms, angle and dihedral atoms should be the earlycommer atoms in library
+    # implicit rule for atom connections for dihedral (4-atom) and angle (3-atom)
+    1. Backbone atoms (N or C) assinged as backbone H's dihedral atom
+    2. For side-chain H atoms, angle and dihedral atoms should be the earlycommer atoms in library
+    3. If bond_atom_idx, angle_atom_idx and dihedral_atom_idx are assigned as -1,
+       skip the calculation of geometric values.
+    4. In this
     """
     zmatrix = {}
     for iatm, jatm in atoms_connect:
