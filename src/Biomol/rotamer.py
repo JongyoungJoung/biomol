@@ -122,10 +122,15 @@ def get_sidechain_rotamers(
     rank: int = 0,
 ) -> list[float]:
     """
-    Args.
+    Select the most probable side chain dihedral angles.
 
-    sort_by : column for sorting selected dataframe
-    rank : rank of data selected after sorted by [sort_by] column, 0: first
+    Args:
+    - rotamer_lib: loaded rotamer library
+    - resname: target residue name.
+    - phi: backbone chi angle
+    - psi: backbone chi angle
+    - sort_by: column for sorting selected dataframe
+    - rank: rank of data selected after sorted by [sort_by] column, 0: first
     """
     rotamers = [0.0, 0.0, 0.0, 0.0]
     phi_key = round(phi, -1)

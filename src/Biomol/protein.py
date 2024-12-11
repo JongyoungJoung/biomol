@@ -8,7 +8,7 @@ from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
 from biomol import coordinate, rotamer
-from biomol.topology import AmberTopology
+from biomol.topology import AmberParameter, AmberTopology
 
 
 class ChainSelect(Select):
@@ -38,9 +38,16 @@ class Protein:
         ff_type: Literal["ff99SB", "ff12SB", "ff14SB", "ff19SB"] = "ff19SB",
         # remove_het_only_chain: bool | None = True,
     ):
+        """
+        Instance variables.
+
+        - self.residues: {chainid: {resid: residueObj, ..}  Key parsed information of a protein
+
+        """
+        # basic information
         self.pdbfile_path = pdbfile_path
-        self.residues = {}  # {chainid: {resid: residueObj, ..}, }
-        # self.residue_ids = {}
+        self.residues = {}
+        # processed information
         self.exposed_sasa_ratio = {}
         self.detected_surface_residues = {}
         self.seqres = {}
@@ -49,6 +56,7 @@ class Protein:
         self.forcefield_loaded = False
         self.forcefield_type = ff_type
         self.topology: AmberTopology
+        self.parameter: AmberParameter
 
         Protein.check_pdb_file(self.pdbfile_path)
         pdb_parser = PDBParser(QUIET=True)
@@ -267,9 +275,7 @@ class Protein:
         """
         if not self.forcefield_loaded:
             self.topology = AmberTopology()
-            # TODO:
-            #    loading force field parameters..
-
+            self.parameter = AmberParameter()
             self.forcefield_loaded = True
 
     def calc_dihedral_angle_of_residue_with_given_type(
@@ -333,14 +339,15 @@ class Protein:
         2. Calculate backbone dihedral angles "phi" and "psi".
         3. Find the most probable chi1 ~ chi4 angles.
         4. Construct atoms' positions of the new residue (mutant).
-          4-1. Copy the wild type residue's backbone information (atom types, coordinate) to mutant's backbone.
+          4-1. Copy the wild type residue's backbone information (atom types, coordinate)
+                    to mutant's backbone.
           4-2. Construct atomic positions
-            4-2-1. Get a predefined internal coordinate (IC) template of atomic composition of a residue.
-            4-2-2. Change IC of backbone part according to a wild type residue's IC
-            4-2-3. Change IC of side chain part according to IC selected in step-3.
-            4-2-4. Convert IC to Cartesian coordinates (CC) (ic2cc method required)
+            4-2-1. Get a predefined internal coordinate (IC) template of
+                        atomic composition of a residue.
+            4-2-2. Change IC of a side chain part according to IC selected in step-3.
+            4-2-3. Convert IC to Cartesian coordinates (CC) (ic2cc method required)
         """
-        # Step-1.
+        # Step 1.
         # if self.rotamer_library is empty (== not initialized yet)
         # RFE:
         # Is it good way to have rotamer library as instance variable??
@@ -349,20 +356,36 @@ class Protein:
         if not self.forcefield_loaded:
             self.init_forcefield()
 
-        # Step-2.
+        # Step 2.
         phi = self.calc_dihedral_angle_of_residue_with_given_type(
             dihedral_type="phi", resid=resid, chainid=chid
         )
         psi = self.calc_dihedral_angle_of_residue_with_given_type(
             dihedral_type="psi", resid=resid, chainid=chid
         )
-        # Step-3.
+        # Step 3.
         sidechain_rotamers = rotamer.get_sidechain_rotamers(
             self.rotamer_library, mut_res, phi, psi, sort_by="Probabil", rank=0
         )
-
-        mutres_int_coord = coordinate.construct_residue_internal_coord_of_sidechain_from_Amber_topology(
-            resname=mut_res, forcefield_topology=self.topology
+        # Step 4.
+        # Step 4-1.
+        copied_backbone_crd = coordinate.copy_backbone_coordinate(
+            residue_obj=self.residues[chid][resid]
+        )
+        # Step 4-2-1
+        # Step 4-2-2
+        mutres_int_coord = coordinate.construct_residue_internal_coord_of_sidechain(
+            resname=mut_res,
+            forcefield_topology=self.topology,
+            forcefield_parameter=self.parameter,
+            chi_angles=sidechain_rotamers,
+        )
+        # Step 4-2-3
+        mutres_cart_coord = coordinate.convert_internal_to_Cartesian_coordinate(
+            resname=mut_res,
+            zmatrix=mutres_int_coord,
+            backbone_crd=copied_backbone_crd,
+            forcefield_topology=self.topology,
         )
 
 

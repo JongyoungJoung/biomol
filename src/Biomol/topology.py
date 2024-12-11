@@ -13,6 +13,7 @@
 #                  "!entry.XXX.unit.connectivity" in the library file
 import os
 import re
+import sys
 
 # from pathlib import Path
 from typing import Literal, TypedDict
@@ -80,7 +81,8 @@ class AmberTopology:
 
     @ Main contents
         Residue types
-        Atoms in the residue type
+        Atom names in the residue type
+        Atom types of atom names of the residue type
         Atom connectivities of the residue type
     """
 
@@ -89,8 +91,9 @@ class AmberTopology:
         fftype: Literal["ff99SB", "ff12SB", "ff14SB", "ff19SB"] = "ff19SB",
     ):
         assert "AMBERHOME" in os.environ, self.report_error()
-        self.AA_ATOMS = {}
-        self.AA_CONNECT = {}
+        self.AA_ATOM_NAMES: dict[str, list[str]] = {}
+        self.AA_ATOM_TYPES: dict[str, dict[str, str]] = {}
+        self.AA_CONNECT: dict[str, list[tuple[int, int]]] = {}
 
         # TODO: change this for alternative options of force field. e.g ff14SB, ff19SB, etc
         self.forcefield_type = fftype
@@ -115,7 +118,8 @@ class AmberTopology:
                     if re.match(line.split()[0], r"!entry\.\w{3}\.unit\.atomspertinfo"):
                         new_amino_acid = True
                         resname = line.split()[0].split(".")[1]
-                        self.AA_ATOMS[resname] = []
+                        self.AA_ATOM_NAMES[resname] = []
+                        self.AA_ATOM_TYPES[resname] = {}
                         continue
                     elif re.match(line.split()[0], r"!entry\.\w{3}\.unit\.boundbox"):
                         new_amino_acid = False
@@ -133,7 +137,9 @@ class AmberTopology:
 
                     if new_amino_acid:
                         atomname = line.split()[0].strip('"')
-                        self.AA_ATOMS[resname].append(atomname)
+                        atomtype = line.split()[1].strip('"')
+                        self.AA_ATOM_NAMES[resname].append(atomname)
+                        self.AA_ATOM_TYPES[resname][atomname] = atomtype
                     if connectivity:
                         iatom, jatom = [int(ele) for ele in line.split()][:2]
                         self.AA_CONNECT[resname].append((iatom, jatom))
@@ -435,6 +441,9 @@ class AmberParameter:
                 with open(parmfile) as parameter_file:
                     for line in parameter_file:
                         element = line.split()
+                        #
+                        # NOTE: Atom mass, polarizability
+                        #
                         if line.startswith("MASS"):
                             read_atom_parm = True
                             continue
@@ -453,6 +462,9 @@ class AmberParameter:
                                     lj_12_power_term=np.nan,
                                     lj_6_power_term=np.nan,
                                 )
+                        #
+                        # NOTE: Bond (2 atoms) force_constant, equilibrium_bond_length
+                        #
                         if line.startswith("BOND"):
                             read_bond_parm = True
                             continue
@@ -468,6 +480,9 @@ class AmberParameter:
                                 force_const=force_const,
                                 equil_bond_length=equil_bond_dist,
                             )
+                        #
+                        # NOTE: Angle (3 atoms) force_constant, equilibrium_angle
+                        #
                         if line.startswith("ANGL"):
                             read_angle_parm = True
                             continue
@@ -483,6 +498,11 @@ class AmberParameter:
                             self.ANGLE_PARAMS[(atom_i, atom_j, atom_k)] = AngleParam(
                                 force_const=force_const, equil_angle=equil_angle
                             )
+                        #
+                        # NOTE: Dihedral (4 atoms)
+                        # - torsional barrier dividing factor (int)
+                        # -
+                        #
                         if line.startswith("DIHE"):
                             read_dihed_parm = True
                             continue
@@ -582,6 +602,173 @@ class AmberParameter:
                             self.ATOM_PARAMS[atom_type]["lj_6_power_term"] = (
                                 lj_6_power_factor
                             )
+
+    def get_bond_dist(self, *, atom_i: str, atom_j: str) -> float:
+        """
+        Get bond parameters' equilibrium bond distance.
+
+        Args:
+        - atom_i : atom type of atom-i. Not atom's name
+        - atom_j : atom type of atom-j
+
+        Returns:
+        - atom_i & atom_j pair's equilibrium bond distance
+        """
+        dist = 0.0
+        if (atom_i, atom_j) in self.BOND_PARAMS:
+            dist = self.BOND_PARAMS[(atom_i, atom_j)]["equil_bond_length"]
+        elif (atom_j, atom_i) in self.BOND_PARAMS:
+            dist = self.BOND_PARAMS[(atom_j, atom_i)]["equil_bond_length"]
+        elif (f"{atom_i[0]}*", atom_j) in self.BOND_PARAMS:
+            dist = self.BOND_PARAMS[(f"{atom_i[0]}*", atom_j)]["equil_bond_length"]
+        elif (atom_j, f"{atom_i[0]}*") in self.BOND_PARAMS:
+            dist = self.BOND_PARAMS[(atom_j, f"{atom_i[0]}*")]["equil_bond_length"]
+        elif (f"{atom_j[0]}*", atom_i) in self.BOND_PARAMS:
+            dist = self.BOND_PARAMS[(f"{atom_j[0]}*", atom_i)]["equil_bond_length"]
+        elif (atom_i, f"{atom_j[0]}*") in self.BOND_PARAMS:
+            dist = self.BOND_PARAMS[(atom_i, f"{atom_j[0]}*")]["equil_bond_length"]
+        else:
+            raise KeyError(f"ERROR: Bond parameter not found for {atom_i} and {atom_j}")
+
+        return dist
+
+    def get_angle_degree(self, *, atom_i: str, atom_j: str, atom_k: str) -> float:
+        """
+        Get angle parameters' equilibrium angle.
+
+        Args:
+        - atom_i, j, k : atom type of atom-i, j, and k. Not atoms' names
+
+        Returns:
+        - Equilibrium angle value
+        """
+        angle = 0.0
+        if (atom_i, atom_j, atom_k) in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(atom_i, atom_j, atom_k)]["equil_angle"]
+        elif (atom_k, atom_j, atom_i) in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(atom_k, atom_j, atom_i)]["equil_angle"]
+
+        elif (f"{atom_i[0]}*", atom_j, atom_k) in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(f"{atom_i[0]}*", atom_j, atom_k)]["equil_angle"]
+        elif (atom_k, atom_j, f"{atom_i[0]}*") in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(atom_k, atom_j, f"{atom_i[0]}*")]["equil_angle"]
+        elif (atom_i, f"{atom_j[0]}*", atom_k) in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(atom_i, f"{atom_j[0]}*", atom_k)]["equil_angle"]
+        elif (atom_k, f"{atom_j[0]}*", atom_i) in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(atom_k, f"{atom_j[0]}*", atom_i)]["equil_angle"]
+        elif (atom_i, atom_j, f"{atom_k[0]}*") in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(atom_i, atom_j, f"{atom_k[0]}*")]["equil_angle"]
+        elif (f"{atom_k[0]}*", atom_j, atom_i) in self.ANGLE_PARAMS:
+            angle = self.ANGLE_PARAMS[(f"{atom_k[0]}*", atom_j, atom_i)]["equil_angle"]
+        else:
+            raise KeyError(
+                f"ERROR: No angle parameter found for {atom_i}, {atom_j} and {atom_k}"
+            )
+
+        return angle
+
+    def get_dihedral_angle(
+        self, *, atom_i: str, atom_j: str, atom_k: str, atom_l: str, dihed_idx: int = 0
+    ) -> float:
+        """
+        Get dihedral parameters' phase shift angles at dihed_idx.
+
+        Args:
+        - atom_i~l : atom type of atom-i ~ l, Not atoms' names
+
+        Returns:
+        - Phase shift angles
+        """
+        dihedral_list = [0.0]
+        # i-j-k-l
+        if (atom_i, atom_j, atom_k, atom_l) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[(atom_i, atom_j, atom_k, atom_l)][
+                "phase_shift_angle"
+            ]
+        # l-k-j-i
+        elif (atom_l, atom_k, atom_j, atom_i) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[(atom_l, atom_k, atom_j, atom_i)][
+                "phase_shift_angle"
+            ]
+        # i-j*-k-l
+        elif (atom_i, f"{atom_j[0]}*", atom_k, atom_l) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[
+                (atom_i, f"{atom_j[0]}*", atom_k, atom_l)
+            ]["phase_shift_angle"]
+        # l-k*-j-i
+        elif (atom_l, f"{atom_k[0]}*", atom_j, atom_i) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[
+                (atom_l, f"{atom_k[0]}*", atom_j, atom_i)
+            ]["phase_shift_angle"]
+        # i-j-k*-l
+        elif (atom_i, atom_j, f"{atom_k[0]}*", atom_l) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[
+                (atom_i, atom_j, f"{atom_k[0]}*", atom_l)
+            ]["phase_shift_angle"]
+        # l-k-j*-i
+        elif (atom_l, atom_k, f"{atom_j[0]}*", atom_i) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[
+                (atom_l, atom_k, f"{atom_j[0]}*", atom_i)
+            ]["phase_shift_angle"]
+        # i-j-k-l*
+        elif (atom_i, atom_j, atom_k, f"{atom_l[0]}*") in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[
+                (atom_i, atom_j, atom_k, f"{atom_l[0]}*")
+            ]["phase_shift_angle"]
+        # l-k-j-i*
+        elif (atom_l, atom_k, atom_j, f"{atom_i[0]}*") in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[
+                (atom_l, atom_k, atom_j, f"{atom_i[0]}*")
+            ]["phase_shift_angle"]
+        # "X" : for general cases
+        # X-j-k-X
+        elif ("X", atom_j, atom_k, "X") in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", atom_j, atom_k, "X")][
+                "phase_shift_angle"
+            ]
+        # X-k-j-X
+        elif ("X", atom_k, atom_j, "X") in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", atom_k, atom_j, "X")][
+                "phase_shift_angle"
+            ]
+        # X-j-k-l
+        elif ("X", atom_j, atom_k, atom_l) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", atom_j, atom_k, atom_l)][
+                "phase_shift_angle"
+            ]
+        # X-k-j-i
+        elif ("X", atom_k, atom_j, atom_i) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", atom_k, atom_j, atom_i)][
+                "phase_shift_angle"
+            ]
+        # X-j*-k-X
+        elif ("X", f"{atom_j[0]}*", atom_k, "X") in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", f"{atom_j[0]}*", atom_k, "X")][
+                "phase_shift_angle"
+            ]
+        # X-j-k*-X
+        elif ("X", atom_j, f"{atom_k[0]}*", "X") in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", atom_j, f"{atom_k[0]}*", "X")][
+                "phase_shift_angle"
+            ]
+        # X-j-k-l
+        elif ("X", atom_j, f"{atom_k[0]}*", atom_l) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", atom_j, f"{atom_k[0]}*", atom_l)][
+                "phase_shift_angle"
+            ]
+        # X-X-k-l
+        elif ("X", "X", f"{atom_k[0]}*", atom_l) in self.DIHED_PARAMS:
+            dihedral_list = self.DIHED_PARAMS[("X", "X", f"{atom_k[0]}*", atom_l)][
+                "phase_shift_angle"
+            ]
+        else:
+            raise KeyError(
+                f"No dihedral angles found for {atom_i}, {atom_j}, {atom_k} and {atom_l}"
+            )
+
+        dihedral = dihedral_list[dihed_idx]
+
+        return dihedral
 
     def report_error(self):
         print("ERROR: Environment variable $AMBERHOME is not defined.")
