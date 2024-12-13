@@ -12,8 +12,7 @@ parentdir_predic = "biomol-"
 
 [project]
 name = "biomol"
-dynamics = ["version", "dependencies", "optional-dependencies"]
-version = "0.0.1"
+dynamic = ["version", "dependencies", "optional-dependencies"]
 authors = [
   { name="Jongyoung Joung", email="jongyoungjoung@gmail.com" },
 ]
@@ -36,9 +35,7 @@ classifiers = [
 keywords = ["development", "template"]
 
 [project.urls]
-#Homepage = "https://github.com/JongyoungJoung/jounglab"
-#Issues = "https://github.com/JongyoungJoung/jounglab/issues"
-Homepage = "https://github.com/deargen/Biomolecule-As-Basis-For-Modeling"
+Homepage = "https://github.com/deargen/biomol"
 
 [project.scripts]
 biomol = "biomol.cli:main"
