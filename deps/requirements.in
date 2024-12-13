@@ -2,4 +2,5 @@ rich>=13.0.0
 tqdm>=4.0.0
 typer>=0.12.4
 python-dotenv
-biopython
+platformdirs
+biopython>=1.80
