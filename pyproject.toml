@@ -46,6 +46,11 @@ dependencies = {file = ["deps/requirements.in"]}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.projector.pip_compile]
+requirements_in_dir = "deps"
+requirements_out_dir = "deps/lock"
+python_platforms = ["x86_64-manylinux_2_28", "aarch64-apple-darwin", "x86_64-apple-darwin"]
+
 [tool.pytest.ini_options]
 addopts = "--cov=biomol"
 testpaths = ["tests"]
