@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 from Bio.PDB import Residue
 from Bio.PDB.PDBIO import PDBIO, Select
@@ -331,7 +332,9 @@ class Protein:
         )
         return dihedral
 
-    def mutate(self, *, resid: int, chid: str, wt_res: str, mut_res: str) -> None:
+    def mutate(
+        self, *, resid: int, chid: str, wt_res: str, mut_res: str
+    ) -> dict[str, np.ndarray]:
         """
         Set mutation on a specific residue.
 
@@ -387,6 +390,9 @@ class Protein:
             backbone_crd=copied_backbone_crd,
             forcefield_topology=self.topology,
         )
+        # Construct Atoms
+
+        return mutres_cart_coord
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import math
 from typing import TypedDict
 
 import numpy as np
@@ -28,7 +29,7 @@ def copy_backbone_coordinate(*, residue_obj: Residue.Residue) -> dict[str, np.nd
     - Dictionary of atom names and their nd.ndarray type of coordinate.
     """
     backbone_atom_names = ["N", "H", "CA", "HA", "C", "O"]
-    bb_crd: dict[str, np.ndarray] = {}  # dict[str, np.array]
+    bb_crd: dict[str, np.ndarray] = {}
     for atom_obj in residue_obj:
         if atom_obj.get_name() in backbone_atom_names:
             bb_crd[atom_obj.get_name()] = atom_obj.get_coords()
@@ -50,21 +51,142 @@ def convert_internal_to_Cartesian_coordinate(  # noqa: N802
     - resname: target residue name, required for AA_ATOM_NAMES, AA_CONNECT
     - zmatrix: (initially) constructed zmatrix
     - backbone_crd: Cartesian coordinates for backbone atoms
+
+    Returns:
+    - dictionary. str: atom_name, ndarray: x,y,z coordinate
+
+    Reference:
+    xyzatm.f90 in tinker source codes
     """
+    eps: float = 0.00000001
     cartcrd: dict[str, np.ndarray] = {}
     ff_top: AmberTopology = forcefield_topology
     res_atom_names: list[str] = ff_top.AA_ATOM_NAMES[resname]
 
+    for atom_name in res_atom_names:
+        cartcrd[atom_name] = np.array((0.0, 0.0, 0.0))
+
     for atom_name, intcrd in zmatrix.items():
         iatm_id = intcrd["this_atom_idx"]
+        # bond
         batm_id = intcrd["bond_atom_idx"]
+        batm_name = res_atom_names[batm_id - 1]
         bond = intcrd["bond_distance"]
+        # angle
         aatm_id = intcrd["angle_atom_idx"]
+        aatm_name = res_atom_names[aatm_id - 1]
         angle = intcrd["angle"]
+        # dihedral
         datm_id = intcrd["dihedral_atom_idx"]
+        datm_name = res_atom_names[datm_id - 1]
         dihed = intcrd["dihedral"]
 
+        sin_angle_rad = 0.0
+        cos_angle_rad = 0.0
+        sin_dihed_rad = 0.0
+        cos_dihed_rad = 0.0
+        if not np.isnan(angle):
+            angle_rad = math.radians(angle)
+            sin_angle_rad = math.sin(angle_rad)
+            cos_angle_rad = math.cos(angle_rad)
+        if not np.isnan(dihed):
+            dihed_rad = math.radians(dihed)
+            sin_dihed_rad = math.sin(dihed_rad)
+            cos_dihed_rad = math.cos(dihed_rad)
+
+        if batm_id == -1:
+            # first atom in zmatrix
+            continue
+        elif aatm_id == -1:
+            # second atom in zmatrix
+            cartcrd[atom_name] = cartcrd[batm_name] + np.array((0.0, 0.0, bond))
+            continue
+        elif datm_id == -1:
+            # third atom in zmatrix
+            bond_crd = cartcrd[batm_name]  # bond atom's crd
+            angl_crd = cartcrd[aatm_name]  # angle atom's crd
+            vec = bond_crd - angl_crd  # vector of bond_atom to angle_atom
+            norm = np.linalg.norm(vec)  # norm of vector of bond_atom to angle_atom
+            unit_vec = vec / norm
+
+            cosb = unit_vec[2]
+            sinb = np.sqrt(unit_vec[0] ** 2, unit_vec[1] ** 2)
+            if sinb == 0.0:
+                cosg = 1.0
+                sing = 0.0
+            else:
+                cosg = unit_vec[1] / sinb
+                sing = unit_vec[0] / sinb
+            xtmp = bond * sin_angle_rad
+            ztmp = norm - bond * cos_angle_rad
+            cartcrd[atom_name][0] = bond_crd[0] + xtmp * cosg + ztmp * sing * sinb
+            cartcrd[atom_name][1] = bond_crd[1] - xtmp * sing + ztmp * cosg * sinb
+            cartcrd[atom_name][2] = bond_crd[2] + ztmp * cosb
+        else:
+            # fourth atom ~
+            bond_crd = cartcrd[batm_name]
+            angl_crd = cartcrd[aatm_name]
+            dihe_crd = cartcrd[datm_name]
+            # vector_ba: bont_atom - angle_atom
+            vec_ba = bond_crd - angl_crd
+            norm_ba = np.linalg.norm(vec_ba)
+            unit_vec_ba = vec_ba / norm_ba
+            # vector_ad: angle_atom - dihedral_atom
+            vec_ad = angl_crd - dihe_crd
+            norm_ad = np.linalg.norm(vec_ad)
+            unit_vec_ad = vec_ad / norm_ad
+            # vector_ba X vector_ad
+            vec_t = np.array((0.0, 0.0, 0.0))
+            vec_t[0] = unit_vec_ba[2] * unit_vec_ad[1] - unit_vec_ba[1] * unit_vec_ad[2]
+            vec_t[1] = unit_vec_ba[0] * unit_vec_ad[2] - unit_vec_ba[2] * unit_vec_ad[0]
+            vec_t[2] = unit_vec_ba[1] * unit_vec_ad[0] - unit_vec_ba[0] * unit_vec_ad[1]
+            cosine = (
+                unit_vec_ba[0] * unit_vec_ad[0]
+                + unit_vec_ba[1] * unit_vec_ad[1]
+                + unit_vec_ba[2] * unit_vec_ad[2]
+            )
+            sine = np.sqrt(np.max([1.0 - cosine**2, eps]))
+            if abs(cosine) >= 1.0:
+                raise RuntimeError(
+                    f"Convert Int2Cart: Undefined Dihedral Angle at atom-{iatm_id} {atom_name}"
+                )
+            vec_t = vec_t / sine
+            vec_u = np.array((0.0, 0.0, 0.0))
+            vec_u[0] = vec_t[1] * unit_vec_ba[2] - vec_t[2] * unit_vec_ba[1]
+            vec_u[1] = vec_t[2] * unit_vec_ba[0] - vec_t[0] * unit_vec_ba[2]
+            vec_u[2] = vec_t[0] * unit_vec_ba[1] - vec_t[1] * unit_vec_ba[0]
+            # Calculate coordinates
+            cartcrd[atom_name][0] = bond_crd[0] + bond * (
+                vec_u[0] * sin_angle_rad * cos_dihed_rad
+                + vec_t[0] * sin_angle_rad * sin_dihed_rad
+                - unit_vec_ba[0] * cos_angle_rad
+            )
+            cartcrd[atom_name][1] = bond_crd[1] + bond * (
+                vec_u[1] * sin_angle_rad * cos_dihed_rad
+                + vec_t[1] * sin_angle_rad * sin_dihed_rad
+                - unit_vec_ba[1] * cos_angle_rad
+            )
+            cartcrd[atom_name][2] = bond_crd[2] + bond * (
+                vec_u[2] * sin_angle_rad * cos_dihed_rad
+                + vec_t[2] * sin_angle_rad * sin_dihed_rad
+                - unit_vec_ba[2] * cos_angle_rad
+            )
+    # translate and rotate converted Cartesian coordinates
+    # to the original backbone coordinates
+    cartcrd = transform_coord(reference_crd=backbone_crd, target_crd=cartcrd)
+
     return cartcrd
+
+
+def transform_coord(
+    *,
+    reference_crd: dict[str, np.ndarray],
+    target_crd: dict[str, np.ndarray],
+    target_atoms: list[str] = ["N", "CA", "C"],
+) -> dict[str, np.ndarray]:
+    transformed_crd: dict[str, np.ndarray] = {}
+
+    return transformed_crd
 
 
 def construct_residue_internal_coord_of_sidechain(
