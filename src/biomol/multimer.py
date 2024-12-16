@@ -35,7 +35,10 @@ class Multimer(protein.Protein):
                 chain2_crd = self.get_atom_crds_and_their_resids(chainid=c2)
 
                 pairs, npairs = pdbutil.get_interface_residues(
-                    chain1_crd, chain2_crd, cut, len(chain1_crd), len(chain2_crd)
+                    chain1_crd,
+                    chain2_crd,
+                    cut,
+                    # len(chain1_crd), len(chain2_crd)
                 )
                 if (c1, c2) not in self.interface_pairs:
                     self.interface_pairs[(c1, c2)] = []

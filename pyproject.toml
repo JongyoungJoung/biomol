@@ -130,6 +130,7 @@ ignore = [
   "UP017",   # datetime.timezone.utc -> datetime.UTC
   "SIM108",  # use ternary operator instead of if-else
   "TRY003",  # long message in except
+  "PLR2004", # magic-value-comparison
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -167,10 +168,10 @@ known-first-party = [
 "easydict".msg = "Use typing.TypedDict instead (also consider dataclasses and pydantic)"
 
 [tool.ruff.lint.pylint]
-max-args = 10
+max-args = 15
 max-bool-expr = 10
 max-statements = 100
-max-returns = 10
+max-returns = 6
 max-public-methods = 30
 max-nested-blocks = 10
 max-locals = 30

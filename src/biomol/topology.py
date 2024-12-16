@@ -13,9 +13,6 @@
 #                  "!entry.XXX.unit.connectivity" in the library file
 import os
 import re
-import sys
-
-# from pathlib import Path
 from typing import Literal, TypedDict
 
 import numpy as np

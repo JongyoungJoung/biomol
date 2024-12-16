@@ -1,15 +1,16 @@
 import math
-from typing import TypedDict
 
 import numpy as np
 from Bio.PDB import Residue
+from typing_extensions import TypedDict
 
 from biomol import rotamer
 from biomol.topology import AmberParameter, AmberTopology
 from biomol.utils import geometry
 
 
-class IntCoord(TypedDict):
+# TODO: consider using NamedTuple?
+class InternalCoordDict(TypedDict):
     this_atom_idx: int
     bond_atom_idx: int
     bond_distance: float
@@ -24,24 +25,24 @@ def copy_backbone_coordinate(*, residue_obj: Residue.Residue) -> dict[str, np.nd
     Get Cartesian coordinates of backbone atoms.
 
     Args:
-    - residue_obj: Bio.PDB.Residue.Residue type. Target residue object
+        residue_obj: Target residue object
 
     Returns:
-    - Dictionary of atom names and their nd.ndarray type of coordinate.
+        Atom names to coordinate.
     """
     backbone_atom_names = ["N", "H", "CA", "HA", "C", "O"]
     bb_crd: dict[str, np.ndarray] = {}
     for atom_obj in residue_obj:
         if atom_obj.get_name() in backbone_atom_names:
-            bb_crd[atom_obj.get_name()] = atom_obj.get_coords()
+            bb_crd[atom_obj.get_name()] = atom_obj.get_coord()
 
     return bb_crd
 
 
-def convert_internal_to_Cartesian_coordinate(  # noqa: N802
+def convert_internal_to_cartesian_coordinate(
     *,
     resname: str,
-    zmatrix: dict[str, IntCoord],
+    zmatrix: dict[str, InternalCoordDict],
     backbone_crd: dict[str, np.ndarray],
     forcefield_topology: AmberTopology,
 ) -> dict[str, np.ndarray]:
@@ -54,10 +55,10 @@ def convert_internal_to_Cartesian_coordinate(  # noqa: N802
     - backbone_crd: Cartesian coordinates for backbone atoms
 
     Returns:
-    - dictionary. str: atom_name, ndarray: x,y,z coordinate
+        atom_name to x,y,z coordinate
 
     Reference:
-    xyzatm.f90 in tinker source codes
+        - xyzatm.f90 in tinker source codes
     """
     eps: float = 0.00000001
     cartcrd: dict[str, np.ndarray] = {}
@@ -233,7 +234,7 @@ def construct_residue_internal_coord_of_sidechain(
     forcefield_topology: AmberTopology,
     forcefield_parameter: AmberParameter,
     chi_angles: list[float] | None = None,
-) -> dict[str, IntCoord]:
+) -> dict[str, InternalCoordDict]:
     """
     Construction of internal coordinates of a residue based on Amber force field.
 
@@ -247,7 +248,7 @@ def construct_residue_internal_coord_of_sidechain(
     res_atom_names: list[str] = ff_top.AA_ATOM_NAMES[resname]
     res_atom_types: dict[str, str] = ff_top.AA_ATOM_TYPES[resname]
     res_atoms_connect: list[tuple[int, int]] = ff_top.AA_CONNECT[resname]
-    zmatrix: dict[str, IntCoord]
+    zmatrix: dict[str, InternalCoordDict]
 
     zmatrix = build_connectivity_for_internal_coordinate(
         resname=resname, atoms_list=res_atom_names, atoms_connect=res_atoms_connect
@@ -267,14 +268,14 @@ def construct_residue_internal_coord_of_sidechain(
 
 def set_geometric_values_from_parameter(
     *,
-    zmatrix: dict[str, IntCoord],
+    zmatrix: dict[str, InternalCoordDict],
     resname: str,
     forcefield_parameter: AmberParameter,
     chi_angles: list[float] | None = None,
     atom_name_list: list[str],
     atom_name_type: dict[str, str],
     dihedral_angle_idx: int = 0,
-) -> dict[str, IntCoord]:
+) -> dict[str, InternalCoordDict]:
     """
     Setup dihedral angles for side chains.
 
@@ -358,7 +359,7 @@ def set_geometric_values_from_parameter(
 
 def build_connectivity_for_internal_coordinate(
     *, resname: str, atoms_list: list[str], atoms_connect: list[tuple[int, int]]
-) -> dict[str, IntCoord]:
+) -> dict[str, InternalCoordDict]:
     """
     Build atom connectivity in internal coordinates based on Amber forcefield library and rotamer dihedral map.
 
@@ -417,7 +418,7 @@ def build_connectivity_for_internal_coordinate(
             # for non-hydrogen atoms
             if len(zmatrix) == 0:
                 # first atom : N (backbone)
-                zmatrix[iatm_name] = IntCoord(
+                zmatrix[iatm_name] = InternalCoordDict(
                     {
                         "this_atom_idx": iatm,
                         "bond_atom_idx": -1,
@@ -429,7 +430,7 @@ def build_connectivity_for_internal_coordinate(
                     }
                 )
                 # second atom CA (backbone)
-                zmatrix[jatm_name] = IntCoord(
+                zmatrix[jatm_name] = InternalCoordDict(
                     {
                         "this_atom_idx": jatm,
                         "bond_atom_idx": iatm,
@@ -443,7 +444,7 @@ def build_connectivity_for_internal_coordinate(
             elif len(zmatrix) == 2:
                 # third atom : CB or C (backbone, GLY)
                 angle_atom_idx = zmatrix[iatm_name]["bond_atom_idx"]
-                zmatrix[atoms_list[jatm - 1]] = IntCoord(
+                zmatrix[atoms_list[jatm - 1]] = InternalCoordDict(
                     {
                         "this_atom_idx": jatm,
                         "bond_atom_idx": iatm,
@@ -460,7 +461,7 @@ def build_connectivity_for_internal_coordinate(
                 angle_atom_name = atoms_list[angle_atom_idx - 1]
                 dihed_atom_idx = zmatrix[angle_atom_name]["bond_atom_idx"]
 
-                zmatrix[atoms_list[jatm - 1]] = IntCoord(
+                zmatrix[atoms_list[jatm - 1]] = InternalCoordDict(
                     {
                         "this_atom_idx": jatm,
                         "bond_atom_idx": iatm,
@@ -490,7 +491,7 @@ def build_connectivity_for_internal_coordinate(
                 angle_atom_idx = zmatrix[iatm_name]["bond_atom_idx"]
                 angle_atom_name = atoms_list[angle_atom_idx - 1]
                 dihed_atom_idx = zmatrix[angle_atom_name]["bond_atom_idx"]
-            zmatrix[jatm_name] = IntCoord(
+            zmatrix[jatm_name] = InternalCoordDict(
                 {
                     "this_atom_idx": iatm,
                     "bond_atom_idx": jatm,

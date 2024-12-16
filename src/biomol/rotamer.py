@@ -153,30 +153,24 @@ def get_sidechain_rotamers(
 def get_atom_with_specific_position_in_sidechain(
     residue_obj: Residue.Residue, position_key: str
 ):
-    atom_obj = Atom.Atom
-    find_atom = False
+    atom_obj = None
     searchable_atom_name_minimum_length = 2
     single_pos = 1
     double_pos = 2
     for atom in residue_obj.get_atoms():
         if len(atom.get_name()) >= searchable_atom_name_minimum_length:
-            """Atom name format: 'XYZ'
-            X: Atom type (C, N, O, S)
-            Y: Position (alpha: A, beta: B, gamma: G, delta: D, epsilon: E, zeta: Z
-            Z: Alternative position id (e.g. CD1 & CD2, CE1 & NE2)
-            """
+            # NOTE: Atom name format: 'XYZ'
+            # X: Atom type (C, N, O, S)
+            # Y: Position (alpha: A, beta: B, gamma: G, delta: D, epsilon: E, zeta: Z
+            # Z: Alternative position id (e.g. CD1 & CD2, CE1 & NE2)
             if (
                 len(position_key) == single_pos and position_key == atom.get_name()[1]
             ) or (
                 len(position_key) == double_pos and position_key == atom.get_name()[1:]
             ):
                 atom_obj = atom
-                find_atom = True
                 break
-    if not find_atom:
-        return None
-    else:
-        return atom_obj
+    return atom_obj
 
 
 def get_dihedral_angle_atom_composition(

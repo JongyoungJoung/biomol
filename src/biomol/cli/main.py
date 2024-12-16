@@ -30,10 +30,11 @@ def common(
 
 @app.command()
 def health():
-    from ..health import main as health_main
-    from ..utils.log import setup_logging
+    from biomol import setup_logging
 
-    setup_logging(output_files=[], file_levels=[])
+    from ..health import main as health_main
+
+    setup_logging()
     health_main()
 
 

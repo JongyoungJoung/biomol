@@ -63,6 +63,7 @@ class Protein:
         pdb_parser = PDBParser(QUIET=True)
 
         self.pdb_str = pdb_parser.get_structure("input_protein", self.pdbfile_path)
+        assert self.pdb_str is not None
         # remove water molecules
         # remove hetero residue only chains
         if remove_wat:
@@ -384,7 +385,7 @@ class Protein:
             chi_angles=sidechain_rotamers,
         )
         # Step 4-2-3
-        mutres_cart_coord = coordinate.convert_internal_to_Cartesian_coordinate(
+        mutres_cart_coord = coordinate.convert_internal_to_cartesian_coordinate(
             resname=mut_res,
             zmatrix=mutres_int_coord,
             backbone_crd=copied_backbone_crd,
