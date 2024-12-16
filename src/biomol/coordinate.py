@@ -6,6 +6,7 @@ from Bio.PDB import Residue
 
 from biomol import rotamer
 from biomol.topology import AmberParameter, AmberTopology
+from biomol.utils import geometry
 
 
 class IntCoord(TypedDict):
@@ -182,9 +183,46 @@ def transform_coord(
     *,
     reference_crd: dict[str, np.ndarray],
     target_crd: dict[str, np.ndarray],
-    target_atoms: list[str] = ["N", "CA", "C"],
+    target_atoms: list[str] = ["N", "CA", "C", "O"],
 ) -> dict[str, np.ndarray]:
+    """
+    Transforms the target coordinates to the reference coordinates.
+
+    Args:
+    reference_crd: coordinates of reference atoms.
+    target_crd: coordinates of transforming target atoms.
+    target_atoms: atom names for referencing target_crd to the reference_crd.
+
+    Returns:
+    transformed_crd: transformed target_crd
+    """
     transformed_crd: dict[str, np.ndarray] = {}
+
+    # Reorder atoms' coordinates
+    ref_crds = []
+    tgt_crds = []
+    # first, add atoms' coordinates in the target_atoms
+    for atmnam in target_atoms:
+        ref_crds.append(reference_crd[atmnam])
+        tgt_crds.append(target_crd[atmnam])
+    # second, add other atoms' coordinates of target_crd not in the target_atoms
+    for atmnam in target_crd:
+        if atmnam not in target_atoms:
+            tgt_crds.append(target_crd[atmnam])
+
+    # Convert list[np.ndarray] to np.ndarray
+    ref_crds = np.array(ref_crds)
+    tgt_crds = np.array(tgt_crds)
+
+    # Calculate Kabsch algorithm.
+    trans_tgt_crds = geometry.transform_by_kabsch(
+        P=np.array(ref_crds), Q=tgt_crds[: len(target_atoms)]
+    )
+
+    # Transform the target coordinates
+    idx = 0
+    for idx, atmnam in enumerate(target_crd.keys()):
+        transformed_crd[atmnam] = trans_tgt_crds[idx]
 
     return transformed_crd
 
