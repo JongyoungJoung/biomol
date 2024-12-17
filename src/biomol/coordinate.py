@@ -177,7 +177,42 @@ def convert_internal_to_cartesian_coordinate(
     # to the original backbone coordinates
     cartcrd = transform_coord(reference_crd=backbone_crd, target_crd=cartcrd)
 
+    # Sort atom order like Amber library
+    cartcrd = sort_atom_order(atom_name_crd_dict=cartcrd)
+
     return cartcrd
+
+
+def sort_atom_order(
+    *, atom_name_crd_dict: dict[str, np.ndarray]
+) -> dict[str, np.ndarray]:
+    """
+    Sort atom order like topology like Amber library.
+
+    Args:
+        atom_name_crd_dict: pairing of atom_names and their coordinates
+
+    Returns:
+        reordered atom_names and their coordinates
+    """
+    ordered_atom_crd_dict = {}
+    amber_name_set1 = ["N", "H", "CA", "HA"]
+    amber_name_set2 = ["C", "O"]
+
+    # N-terminal side of backbone
+    for atm in amber_name_set1:
+        ordered_atom_crd_dict[atm] = atom_name_crd_dict[atm]
+
+    # side-chain part of backbone
+    for atm, crd in atom_name_crd_dict.items():
+        if atm not in amber_name_set1 and atm not in amber_name_set2:
+            ordered_atom_crd_dict[atm] = crd
+
+    # C-terminal side of backbone
+    for atm in amber_name_set2:
+        ordered_atom_crd_dict[atm] = atom_name_crd_dict[atm]
+
+    return ordered_atom_crd_dict
 
 
 def transform_coord(
@@ -295,14 +330,14 @@ def set_geometric_values_from_parameter(
         dihe_atm_idx = zmatrix[atomname]["dihedral_atom_idx"]
 
         # skip idx == 1
-        if idx == 2:  # noqa: PLR2004
+        if idx == 2:
             bond_atm_name = atom_name_list[bond_atm_idx - 1]
             bond_atm_type = atom_name_type[bond_atm_name]
             zmatrix[atomname]["bond_distance"] = forcefield_parameter.get_bond_dist(
                 atom_i=atomtype, atom_j=bond_atm_type
             )
 
-        elif idx == 3:  # noqa: PLR2004
+        elif idx == 3:
             bond_atm_name = atom_name_list[bond_atm_idx - 1]
             bond_atm_type = atom_name_type[bond_atm_name]
             zmatrix[atomname]["bond_distance"] = forcefield_parameter.get_bond_dist(
@@ -314,7 +349,7 @@ def set_geometric_values_from_parameter(
                 atom_i=atomtype, atom_j=bond_atm_type, atom_k=angl_atm_type
             )
 
-        elif idx >= 4:  # noqa: PLR2004
+        elif idx >= 4:
             bond_atm_name = atom_name_list[bond_atm_idx - 1]
             bond_atm_type = atom_name_type[bond_atm_name]
             zmatrix[atomname]["bond_distance"] = forcefield_parameter.get_bond_dist(

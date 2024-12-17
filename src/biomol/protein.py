@@ -3,12 +3,13 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from Bio.PDB import Residue
+from Bio.PDB import Atom, Residue
 from Bio.PDB.PDBIO import PDBIO, Select
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
 from biomol import coordinate, rotamer
+from biomol.libs import protein_util
 from biomol.topology import AmberParameter, AmberTopology
 
 
@@ -58,6 +59,8 @@ class Protein:
         self.forcefield_type = ff_type
         self.topology: AmberTopology
         self.parameter: AmberParameter
+        # modification
+        self.mutated_residue: list[Residue.Residue] = []
 
         Protein.check_pdb_file(self.pdbfile_path)
         pdb_parser = PDBParser(QUIET=True)
@@ -334,7 +337,7 @@ class Protein:
         return dihedral
 
     def mutate(
-        self, *, resid: int, chid: str, wt_res: str, mut_res: str
+        self, *, resid: int, chid: str, mut_res_name: str
     ) -> dict[str, np.ndarray]:
         """
         Set mutation on a specific residue.
@@ -351,6 +354,9 @@ class Protein:
             4-2-2. Change IC of a side chain part according to IC selected in step-3.
             4-2-3. Convert IC to Cartesian coordinates (CC) (ic2cc method required)
         """
+        mut_res_name = protein_util.convert_residue_name_to_3_letter(
+            resname=mut_res_name
+        )
         # Step 1.
         # if self.rotamer_library is empty (== not initialized yet)
         # RFE:
@@ -369,7 +375,7 @@ class Protein:
         )
         # Step 3.
         sidechain_rotamers = rotamer.get_sidechain_rotamers(
-            self.rotamer_library, mut_res, phi, psi, sort_by="Probabil", rank=0
+            self.rotamer_library, mut_res_name, phi, psi, sort_by="Probabil", rank=0
         )
         # Step 4.
         # Step 4-1.
@@ -379,21 +385,68 @@ class Protein:
         # Step 4-2-1
         # Step 4-2-2
         mutres_int_coord = coordinate.construct_residue_internal_coord_of_sidechain(
-            resname=mut_res,
+            resname=mut_res_name,
             forcefield_topology=self.topology,
             forcefield_parameter=self.parameter,
             chi_angles=sidechain_rotamers,
         )
         # Step 4-2-3
         mutres_cart_coord = coordinate.convert_internal_to_cartesian_coordinate(
-            resname=mut_res,
+            resname=mut_res_name,
             zmatrix=mutres_int_coord,
             backbone_crd=copied_backbone_crd,
             forcefield_topology=self.topology,
         )
         # Construct Atoms
+        mutresidue = self.build_new_residue(
+            resid=resid, resname=mut_res_name, atom_name_crd_dict=mutres_cart_coord
+        )
 
         return mutres_cart_coord
+
+    def build_new_residue(
+        self,
+        *,
+        resid: int,
+        resname: str,
+        atom_name_crd_dict: dict[str, np.ndarray],
+        default_atom_bfactor: float = 30.0,
+        default_atom_occupancy: float = 1.0,
+        last_atom_serial_num: int = 0,
+    ) -> Residue.Residue:
+        """
+        Build new residue object of Biopython with atom_name and crd pairs.
+
+        Args:
+            resid: residue index
+            resname: residue name (3 letters)
+            atom_name_crd_dict: atom_name and crd pair
+            default_atom_bfactor: atomic bfactor (default)
+            default_atom_occupancy: atomic occupancy (default)
+            last_atom_serial_num: last atom's serial number of previous residue,
+                                  needed for continous atomic serial number
+
+        Returns:
+            Biopython Residue class object
+        """
+        res_id = (" ", resid, " ")
+        new_residue = Residue.Residue(res_id, resname, " ")
+
+        for atom_name, crd in atom_name_crd_dict.items():
+            last_atom_serial_num += 1
+            new_atom = Atom.Atom(
+                name=atom_name,
+                coord=crd,
+                bfactor=default_atom_bfactor,
+                occupancy=default_atom_occupancy,
+                element=atom_name[0],
+                altloc=" ",
+                fullname=atom_name,
+                serial_number=last_atom_serial_num,
+            )
+            new_residue.add(new_atom)
+
+        return new_residue
 
 
 if __name__ == "__main__":
