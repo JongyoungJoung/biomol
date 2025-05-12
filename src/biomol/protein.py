@@ -1,3 +1,4 @@
+from functools import reduce
 from pathlib import Path
 from typing import Literal
 
@@ -8,6 +9,7 @@ from Bio.PDB.PDBIO import PDBIO, Select
 from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
+from biomol import biomol_residue as bioresidue
 from biomol import coordinate, rotamer
 from biomol.libs import protein_util
 from biomol.topology import AmberParameter, AmberTopology
@@ -23,6 +25,19 @@ class ChainSelect(Select):
 
     def accept_chain(self, chain):
         return chain.id == self.chainID
+
+
+class ChainTerSelect(Select):
+    """
+    For selecting all pdb lines including TER lines when extracted into a pdb file.
+    """
+
+    def __init__(self):
+        self.prev_chain_id = None
+
+    def accept_residue(self, residue):  # type: ignore
+        # Accept  all residues
+        return True
 
 
 class Protein:
@@ -49,6 +64,7 @@ class Protein:
         # basic information
         self.pdbfile_path = pdbfile_path
         self.residues = {}
+        self.num_atoms = 0
         # processed information
         self.exposed_sasa_ratio = {}
         self.detected_surface_residues = {}
@@ -69,18 +85,25 @@ class Protein:
         assert self.pdb_str is not None
         # remove water molecules
         # remove hetero residue only chains
-        if remove_wat:
-            for model in self.pdb_str:
-                for chain in list(model):
-                    is_het_only_chain = True
-                    for residue in list(chain):
-                        if residue.get_id()[0] == "W" or residue.get_resname() == "HOH":
-                            chain.detach_child(residue.id)
-                        if residue.get_id()[0] == " ":
-                            # if any nomal amino acid appear
-                            is_het_only_chain = False
-                    if is_het_only_chain:
-                        model.detach_child(chain.id)
+        for model in self.pdb_str:
+            for chain in list(model):
+                is_het_only_chain = True
+                for residue in list(chain):
+                    # if residue.get_id()[0] == "W" or residue.get_resname() == "HOH":
+                    if remove_wat and (
+                        residue.get_id()[0] == "W"
+                        or bioresidue.is_solvent(residue.get_resname())
+                    ):
+                        chain.detach_child(residue.id)
+                        continue
+                    # count up number of atoms
+                    for _ in residue:
+                        self.num_atoms += 1
+                    if residue.get_id()[0] == " ":
+                        # if any nomal amino acid appear
+                        is_het_only_chain = False
+                if is_het_only_chain:
+                    model.detach_child(chain.id)
 
         self.pdb_model = self.pdb_str[0]
 
@@ -92,7 +115,7 @@ class Protein:
                 if this_chid not in self.residues:
                     self.residues[this_chid] = {}
                 # NOTE: For convenient hashing residues by residue id
-                #       self.residues : {'chain_id': {resid_i: residue_obj}}
+                #       self.residues : {'chain_id': {resid_id: residue_obj}}
                 for residue in chain:
                     self.residues[this_chid][residue.get_id()[1]] = residue
 
@@ -117,6 +140,16 @@ class Protein:
             # type(chids) is list
             return [c.upper() for c in chids]
 
+    @staticmethod
+    def get_atomic_crds_of_residue(residue: Residue.Residue) -> list:
+        res_crds = []
+        for atom in residue:
+            res_crds.append(atom.get_coord())
+        return res_crds
+
+    def get_num_atoms(self) -> int:
+        return self.num_atoms
+
     def get_num_chain(self) -> int:
         return len(self.residues)
 
@@ -125,6 +158,33 @@ class Protein:
 
     def get_residues(self) -> dict:
         return self.residues
+
+    def get_residues_as_one_dict(self, chid: str | None = None) -> dict:
+        if chid is None:
+            # NOTE: if  chid is not given. choose all chains' residues.
+            all_ = [residues for _, residues in self.residues.items()]
+            all_residues = {}
+            if self.get_num_chain() > 1:
+                # 1. first check whether residues' names of multiple chains are redundant
+                common_resname = set(all_[0]).intersection(
+                    *(d.keys() for d in all_[1:])
+                )
+                if len(common_resname) >= 1:
+                    # if at least one common residue ids are found, replace all the residue name
+                    for ch, residues in self.residues.items():
+                        for res_id, res_obj in residues.items():
+                            all_residues[f"{ch}_{res_id}"] = res_obj
+                else:
+                    # if all residue ids are unique, just merge all chain dictionary of residues
+                    all_residues = reduce(lambda a, b: a | b, all_)
+
+                return all_residues
+            else:
+                # if this protein has a single chain.
+                return all_[0]
+        else:
+            # NOTE: If specific chain id is given.
+            return self.residues[chid]
 
     def get_residue_ids(self, chainid: str | None = None) -> list | dict:
         if chainid is None:
@@ -136,6 +196,9 @@ class Protein:
             return list(self.residues[chainid].keys())
 
     def get_crds_list(self, chainid: str | list | None = None) -> list:
+        """
+        Get all the coordinates of this chain or protein.
+        """
         crdlist = []
         if chainid is not None:
             chainid = Protein.util_upper_chainids(chainid)
@@ -150,6 +213,8 @@ class Protein:
         return crdlist
 
     def get_residue_of_specific_resid(self, resid: int, chainid: str | None = None):
+        # FIXME:
+        # Way to indicate a specific residue should be updated.
         if chainid is not None:
             return self.residues[chainid][resid]
         else:
@@ -184,9 +249,28 @@ class Protein:
                         self.seqres[chainid] = []
                     self.seqres[chainid].append(line)
 
-    def extract_all_chains(self) -> None:
+    def extract_as_one_pdbfile(self, *, outpdb_name: str | None = None) -> None:
+        """
+        Extract pdb object into one pdb file.
+        """
+        if outpdb_name is None:
+            name = Path(self.pdbfile_path).stem
+        else:
+            name = Path(outpdb_name).stem
+
+        io = PDBIO()
+        io.set_structure(self.pdb_str)
+        io.save(f"{name}.pdb", select=ChainTerSelect())
+
+    def extract_all_chains(self, *, outpdb_name: str | None = None) -> None:
+        """
+        Extract all chains into individual pdb files.
+        """
         # name, ext = osp.splitext(self.pdbfile_path)
-        name = Path(self.pdbfile_path).stem
+        if outpdb_name is None:
+            name = Path(self.pdbfile_path).stem
+        else:
+            name = Path(outpdb_name).stem
 
         io = PDBIO()
         io.set_structure(self.pdb_str)
@@ -201,6 +285,9 @@ class Protein:
                 io.save(out_file, select=ChainSelect(cid))
 
     def extract_specific_chains(self, chains: str | list) -> None:
+        """
+        Extract specific chains into pdb files.
+        """
         # name, ext = osp.splitext(self.pdbfile_path)
         name = Path(self.pdbfile_path).stem
         io = PDBIO()
@@ -229,13 +316,13 @@ class Protein:
             sr.compute(chain, level="R")
             chain_sasa[chain.id] = {}
             for residue in chain:
-                chain_sasa[chain.id][residue.id] = residue.sasa
+                chain_sasa[chain.id][residue.id] = residue.sasa  # type: ignore
         residue_sasa = {}  # SASA of residues when it exists as a single amino acid with the same conformation
         for chain in self.pdb_model:
             residue_sasa[chain.id] = {}
             for residue in chain:
                 sr.compute(residue, level="R")
-                residue_sasa[chain.id][residue.id] = residue.sasa
+                residue_sasa[chain.id][residue.id] = residue.sasa  # type: ignore
         # get SASA ratio (sasa of "in_fold" / sasa of "alone")
         for chain in self.pdb_model:
             self.exposed_sasa_ratio[chain.id] = {}
@@ -300,14 +387,14 @@ class Protein:
                     """If chainid is None, select residue of resid found first in chain list"""
                     resid2resobj_dict = self.residues[ch]
                     break
-        assert isinstance(
-            resid2resobj_dict, dict
-        ), f"{chainid} does not exist in this protein model."
+        assert isinstance(resid2resobj_dict, dict), (
+            f"{chainid} does not exist in this protein model."
+        )
         key1 = next(iter(resid2resobj_dict))
         first_residue = resid2resobj_dict[key1]
-        assert isinstance(
-            first_residue, Residue.Residue
-        ), "Residue.Residue objects should be in the resid2resobj_dict"
+        assert isinstance(first_residue, Residue.Residue), (
+            "Residue.Residue objects should be in the resid2resobj_dict"
+        )
 
         resname = resid2resobj_dict[resid].get_resname()
         prev_res = None
