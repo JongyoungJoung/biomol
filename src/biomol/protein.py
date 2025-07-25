@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from Bio.PDB import Atom, Residue
 from Bio.PDB.PDBIO import PDBIO, Select
@@ -65,6 +66,8 @@ class Protein:
         self.pdbfile_path = pdbfile_path
         self.residues = {}
         self.num_atoms = 0
+        self.num_residues = 0
+        self.ssbond_pair = {}
         # processed information
         self.exposed_sasa_ratio = {}
         self.detected_surface_residues = {}
@@ -82,7 +85,9 @@ class Protein:
         pdb_parser = PDBParser(QUIET=True)
 
         self.pdb_str = pdb_parser.get_structure("input_protein", self.pdbfile_path)
-        assert self.pdb_str is not None
+        assert self.pdb_str is not None, (
+            "Failed to generate Biopython.PDB object when reading input pdb file"
+        )
         # remove water molecules
         # remove hetero residue only chains
         for model in self.pdb_str:
@@ -129,7 +134,7 @@ class Protein:
     @staticmethod
     def check_pdb_file(file_path) -> None:
         assert isinstance(file_path, str), "File path must be a string"
-        assert file_path.endswith(".pdb"), "File must have .pdb extension"
+        assert Path(file_path).suffix == ".pdb", "File must have .pdb extension"
         assert Path(file_path).is_file(), f"{file_path} is not a valid file"
 
     @staticmethod
@@ -147,6 +152,42 @@ class Protein:
             res_crds.append(atom.get_coord())
         return res_crds
 
+    @staticmethod
+    def get_residue_formal_charge(
+        *,
+        residue: Residue.Residue,
+        is_N_terminal: bool = False,
+        is_C_terminal: bool = False,
+    ) -> int | float:
+        """
+        Return a residue's formal net charge.
+        """
+        metal_ions = ["ZN", "MG", "FE", "CA", "MN"]
+        res_charge = 0.0
+        resname = residue.get_resname()
+        if resname in ["ARG", "LYS", "HIP"]:
+            res_charge = 1.0
+        elif resname in ["ASP", "GLU", "CYM"]:
+            res_charge = -1.0
+        elif resname in ["SEP", "TPO"]:
+            res_charge = -2.0
+        elif resname in ["GDP", "ADP"]:
+            res_charge = -3.0
+        elif resname in ["GTP", "GNP", "GCP", "GSP", "ATP", "ACP"]:
+            res_charge = -4.0
+        elif any(metal in resname for metal in metal_ions):
+            res_charge = -2.0
+        else:
+            res_charge = 0.0
+
+        # NOTE: if a residue is a single amino acid, it can be both N-terminal and C-terminal.
+        if is_N_terminal:
+            res_charge += 1.0
+        if is_C_terminal:
+            res_charge -= 1.0
+
+        return res_charge
+
     def get_num_atoms(self) -> int:
         return self.num_atoms
 
@@ -157,7 +198,20 @@ class Protein:
         return list(self.residues.keys())
 
     def get_residues(self) -> dict:
+        """
+        Return residues dictionary.
+
+        Return value:
+            {chain_id: {residues_id(=original id) : Bio.PDB.Residue.Residue object}, ...}
+        """
         return self.residues
+
+    def get_num_residues(self) -> int:
+        self.num_residues = 0
+        for _, chain_residues in self.residues.items():
+            self.num_residues += len(chain_residues)
+
+        return self.num_residues
 
     def get_residues_as_one_dict(self, chid: str | None = None) -> dict:
         if chid is None:
@@ -195,21 +249,27 @@ class Protein:
         else:
             return list(self.residues[chainid].keys())
 
-    def get_crds_list(self, chainid: str | list | None = None) -> list:
+    def get_crds_list(
+        self, *, chainid: str | list | None = None, as_list: bool = False
+    ) -> list | npt.NDArray:
         """
         Get all the coordinates of this chain or protein.
         """
-        crdlist = []
+        crdlist: list | npt.NDArray = []
         if chainid is not None:
             chainid = Protein.util_upper_chainids(chainid)
 
         # res: Biopython.PDB.Residue
-        for chid, reslist in self.residues.items():
+        for chid, resdict in self.residues.items():
+            # NOTE: If chainid is available, Only residue crds from the selected chain.
             if chainid is not None and chid.upper() not in chainid:
                 continue
-            for res in reslist:
-                for atm in res:
+            for _, resobj in resdict.items():
+                for atm in resobj:
                     crdlist.append(atm.get_coord())
+        if not as_list:
+            crdlist = np.array(crdlist)
+
         return crdlist
 
     def get_residue_of_specific_resid(self, resid: int, chainid: str | None = None):
@@ -225,22 +285,77 @@ class Protein:
             return residue_list
 
     def get_atom_crds_and_their_resids(self, chainid: str | list | None = None) -> list:
+        """
+        Get atoms' XYZ coordinates and their residue ids.
+
+        Return:
+            [[(x, y, z), resid], ....]
+        """
         crdlist = []
         if chainid is not None:
             chainid = Protein.util_upper_chainids(chainid)
 
-        for chid, reslist in self.residues.items():
+        for chid, resdict in self.residues.items():
             if chainid is not None and chid.upper() not in chainid:
                 continue
-            for res in reslist:
+            for resid, res in resdict.items():
                 for atm in res:
                     tmp = []
                     tmp.extend(atm.get_coord())
+                    # resid == res.get_id()[1]
                     tmp.append(res.get_id()[1])
+                    # NOTE: [(X, Y, Z), Resid]
                     crdlist.append(tmp)
+
         return crdlist
 
+    def search_ss_bond(self, *, ssbond_dist: float = 2.05) -> bool:
+        """
+        Search CYS residues and check disulfide bond between SG atoms.
+        """
+        found: bool = False
+        # NOTE: search CYS residues
+        cys_sg_dict = {}
+        for chid, resdict in self.residues.items():
+            for resid, res in resdict.items():
+                if res.get_resname() in ["CYS", "CYX"]:
+                    for atm in res:
+                        if atm.get_name() == "SG":
+                            cys_sg_dict[(chid, resid)] = atm.get_coord()
+
+        # NOTE: check SS bond
+        cys_sg_ids = list(cys_sg_dict.keys())
+        for i in range(len(cys_sg_ids) - 1):
+            sg_1_id = cys_sg_ids[i]
+            sg_1_crd = cys_sg_dict[sg_1_id]
+
+            for j in range(i + 1, len(cys_sg_ids)):
+                sg_2_id = cys_sg_ids[j]
+                sg_2_crd = cys_sg_dict[sg_2_id]
+
+                if np.linalg.norm(sg_1_crd - sg_2_crd) <= ssbond_dist:
+                    self.ssbond_pair[sg_1_id] = sg_2_id
+                    self.ssbond_pair[sg_2_id] = sg_1_id
+        if self.ssbond_pair:
+            found = True
+
+        return found
+
+    def get_ssbond_pair(self) -> dict:
+        """
+        Get SS-bond pairs.
+
+        Return:
+            {(chid_1, resid_1):(chid_2, resid_2),
+             (chid_2, resid_2):(chid_1, resid_1)
+            ...}
+        """
+        return self.ssbond_pair
+
     def extract_seqres_records(self) -> None:
+        """
+        Extract SEQRES records from the input pdb file.
+        """
         with open(self.pdbfile_path) as pdbfile:
             for line in pdbfile:
                 if line.startswith("SEQRES"):
@@ -441,6 +556,10 @@ class Protein:
             4-2-2. Change IC of a side chain part according to IC selected in step-3.
             4-2-3. Convert IC to Cartesian coordinates (CC) (ic2cc method required)
         """
+        # FIX:
+        #  @ 2025.07.01. Mutation function can't work properly
+        #                in generating internal coordinates from rotamer library
+
         mut_res_name = protein_util.convert_residue_name_to_3_letter(
             resname=mut_res_name
         )

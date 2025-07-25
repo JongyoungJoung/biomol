@@ -44,6 +44,10 @@ SOLVENT = ["WAT", "HOH", "Na+", "Cl-"]
 
 COFACTOR = ["GDP", "GTP", "GCP", "GSP", "GNP", "ATP", "ANP", "ACP"]
 
+WATERS = ["WAT", "HOH"]
+
+NEUTRAL_ION = ["Na+", "Cl-"]
+
 
 def is_amino_acid(resname: str):
     return resname in STANDARD_AMINO_ACIDS
@@ -51,3 +55,15 @@ def is_amino_acid(resname: str):
 
 def is_solvent(resname: str):
     return resname in SOLVENT
+
+
+def is_water(resname: str):
+    return resname in WATERS
+
+
+def is_metal_ion(resname: str):
+    return resname in METAL_IONS
+
+
+def is_neutral_ion(resname: str):
+    return resname in NEUTRAL_ION
