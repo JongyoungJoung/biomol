@@ -97,7 +97,10 @@ def extract_geometric_features(*, complex_obj: PL_Com, feature_type: list[str]) 
 
 
 def collect_crds_of_trajectories(
-    *, first_traj: int = 1, last_traj: int = -1
+    *,
+    first_traj: int = 1,
+    last_traj: int = -1,
+    num_crd_per_traj: int = -1,
 ) -> tuple[list, dict]:
     """
     Colloect trajectories' coordinates files.
@@ -130,9 +133,22 @@ def collect_crds_of_trajectories(
             continue
         else:
             print(f"     - Num of coordinates: {len(traj_coords)}")
-            coord_list.extend(traj_coords)
-        # NOTE: for indexing frames from multiple trajectories
-        crd_count_per_traj[tid + 1] = len(traj_coords)
+            if num_crd_per_traj == -1:
+                print("       All coordinates are selected.")
+                coord_list.extend(traj_coords)
+                # NOTE: for indexing frames from multiple trajectories
+                crd_count_per_traj[tid + 1] = len(traj_coords)
+            else:
+                if len(traj_coords) >= num_crd_per_traj:
+                    print(f"       {num_crd_per_traj} coordinates are selected.")
+                    coord_list.extend(traj_coords[:num_crd_per_traj])
+                    # NOTE: for indexing frames from multiple trajectories
+                    crd_count_per_traj[tid + 1] = num_crd_per_traj
+                else:
+                    print("       All coordinates are selected.")
+                    coord_list.extend(traj_coords)
+                    # NOTE: for indexing frames from multiple trajectories
+                    crd_count_per_traj[tid + 1] = len(traj_coords)
 
     abspath_coord_list = []  # Absolute path of coordinate files
     if len(coord_list) == 0:
@@ -429,7 +445,7 @@ def free_energy_landscape(
     n_cv: int = 5,
     n_eval_bandwidth_kernel: int = 100,
     sample_select_ratio_cluster: float = 0.1,
-    sample_select_num_cluster: int = 1000,
+    sample_select_num_cluster: int = -1,
     min_sample_select_num_cluster: int = 30,
     ratio_of_density_in_closeness_distance: float = 0.9,
     seq_frame_id_to_traj_frame_id: dict = {0: []},
@@ -656,29 +672,36 @@ def free_energy_landscape(
         #   - just collect 10 (default) % of samples according to the closeness score
         # => This part requires REFACTORING...
         # ======================================================================================
-        if (
-            min_sample_select_num_cluster
-            > len(cls_pnt_ids) * sample_select_ratio_cluster
-        ):
-            # n_select_sample < 30
-            n_select = min_sample_select_num_cluster
-        elif (
-            sample_select_num_cluster * n_select_weight
-            > int(len(cls_pnt_ids) * sample_select_ratio_cluster)
-            >= min_sample_select_num_cluster
-        ):
-            # 30 <= n_select_sample < 1000 * 0.1
-            n_select = int(len(cls_pnt_ids) * sample_select_ratio_cluster)
-        elif (
-            sample_select_num_cluster
-            > int(len(cls_pnt_ids) * sample_select_ratio_cluster)
-            >= sample_select_num_cluster * n_select_weight
-        ):
-            # 1000 * 0.1 < n_select_sample < 1000
-            n_select = int(sample_select_num_cluster * n_select_weight)
-        else:
-            # n_select_sample >= 1000
+
+        # if (
+        #     min_sample_select_num_cluster
+        #     > len(cls_pnt_ids) * sample_select_ratio_cluster
+        # ):
+        #     # n_select_sample < 30
+        #     n_select = min_sample_select_num_cluster
+        # elif (
+        #     sample_select_num_cluster * n_select_weight
+        #     > int(len(cls_pnt_ids) * sample_select_ratio_cluster)
+        #     >= min_sample_select_num_cluster
+        # ):
+        #     # 30 <= n_select_sample < 1000 * 0.1
+        #     n_select = int(len(cls_pnt_ids) * sample_select_ratio_cluster)
+        # elif (
+        #     sample_select_num_cluster
+        #     > int(len(cls_pnt_ids) * sample_select_ratio_cluster)
+        #     >= sample_select_num_cluster * n_select_weight
+        # ):
+        #     # 1000 * 0.1 < n_select_sample < 1000
+        #     n_select = int(sample_select_num_cluster * n_select_weight)
+        # else:
+        #     # n_select_sample >= 1000
+        #     n_select = sample_select_num_cluster
+
+        if sample_select_num_cluster != -1:
             n_select = sample_select_num_cluster
+        else:
+            n_select = int(len(cls_pnt_ids)) * sample_select_ratio_cluster
+
         # HACK: =================================================================================
         # NOTE: where_is_max_n: this is not original indcies.
         # The indices of top "n_select" of closensess scores IN THE ARRAY of "cls_pnt_ids"
@@ -870,6 +893,14 @@ def parse_args():
         + " CAUTION: stride MUST NOT be larger than number of frames in a trajectory file",
     )
     parser.add_argument(
+        "-ncrd_per_traj",
+        "--num-crd-per-each-traj",
+        dest="num_crd_per_traj",
+        type=int,
+        default=-1,
+        help="Numbner of coordinates to be selected in each trajectory. -1 -> select all",
+    )
+    parser.add_argument(
         "-feat",
         "--feature",
         choices=["atom_contact", "hbond", "hydrophobic"],
@@ -890,7 +921,7 @@ def parse_args():
         "-sample-num",
         dest="num_sample",
         type=int,
-        default=1000,
+        default=-1,
         help="Number of samples selected from each cluster. default:1000 (samples/cluster)",
     )
     parser.add_argument(
@@ -932,7 +963,9 @@ def main():
     # NOTE: Collect coordinate files
     # coord_list : absoulte paths of coordinate files
     coord_list, crd_count_per_traj = collect_crds_of_trajectories(
-        first_traj=args.start_traj, last_traj=args.end_traj
+        first_traj=args.start_traj,
+        last_traj=args.end_traj,
+        num_crd_per_traj=args.num_crd_per_traj,
     )
 
     print("4. Generate PyEMMA Featurizer")
