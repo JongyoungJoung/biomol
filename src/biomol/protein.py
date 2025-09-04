@@ -48,7 +48,7 @@ class Protein:
 
     def __init__(
         self,
-        pdbfile_path: str,
+        infile: str,
         chid: str | None = None,
         *,
         remove_wat: bool | None = True,
@@ -63,7 +63,9 @@ class Protein:
 
         """
         # basic information
-        self.pdbfile_path = pdbfile_path
+        assert Path(infile).suffix == ".pdb", "Input file should be a pdb file"
+
+        self.infile = infile
         self.residues = {}
         self.num_atoms = 0
         self.num_residues = 0
@@ -81,10 +83,10 @@ class Protein:
         # modification
         self.mutated_residue: list[Residue.Residue] = []
 
-        Protein.check_pdb_file(self.pdbfile_path)
+        Protein.check_pdb_file(self.infile)
         pdb_parser = PDBParser(QUIET=True)
 
-        self.pdb_str = pdb_parser.get_structure("input_protein", self.pdbfile_path)
+        self.pdb_str = pdb_parser.get_structure("input_protein", self.infile)
         assert self.pdb_str is not None, (
             "Failed to generate Biopython.PDB object when reading input pdb file"
         )
@@ -109,7 +111,6 @@ class Protein:
                         is_het_only_chain = False
                 if is_het_only_chain:
                     model.detach_child(chain.id)
-
         self.pdb_model = self.pdb_str[0]
 
         if chid is not None:
@@ -356,7 +357,7 @@ class Protein:
         """
         Extract SEQRES records from the input pdb file.
         """
-        with open(self.pdbfile_path) as pdbfile:
+        with open(self.infile) as pdbfile:
             for line in pdbfile:
                 if line.startswith("SEQRES"):
                     chainid = line[11]
@@ -369,7 +370,7 @@ class Protein:
         Extract pdb object into one pdb file.
         """
         if outpdb_name is None:
-            name = Path(self.pdbfile_path).stem
+            name = Path(self.infile).stem
         else:
             name = Path(outpdb_name).stem
 
@@ -381,9 +382,9 @@ class Protein:
         """
         Extract all chains into individual pdb files.
         """
-        # name, ext = osp.splitext(self.pdbfile_path)
+        # name, ext = osp.splitext(self.infile)
         if outpdb_name is None:
-            name = Path(self.pdbfile_path).stem
+            name = Path(self.infile).stem
         else:
             name = Path(outpdb_name).stem
 
@@ -403,8 +404,8 @@ class Protein:
         """
         Extract specific chains into pdb files.
         """
-        # name, ext = osp.splitext(self.pdbfile_path)
-        name = Path(self.pdbfile_path).stem
+        # name, ext = osp.splitext(self.infile)
+        name = Path(self.infile).stem
         io = PDBIO()
         io.set_structure(self.pdb_str)
         target_cids = "".join(chains)

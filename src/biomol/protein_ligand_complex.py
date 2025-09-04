@@ -23,16 +23,16 @@ class ProteinLigandComplex:
     def __init__(
         self,
         *,
-        inpdb: str,
+        infile: str,
         pdbname: str | None = None,
         preserve_intermediate_files: bool = False,
         desolvate: bool = False,
         verbose: bool = False,
     ):
-        self.inpdb = inpdb
+        self.infile = infile
         self.pdbname: str
         if pdbname is None:
-            self.pdbname = Path(self.inpdb).stem
+            self.pdbname = Path(self.infile).stem
         else:
             self.pdbname = Path(pdbname).name
         self.receptor_pdbname: str = ""
@@ -69,7 +69,7 @@ class ProteinLigandComplex:
         prev_resid = -1
         prev_atmid = -1
         prev_org_resid = -1
-        with open(self.inpdb) as inpdb:
+        with open(self.infile) as inpdb:
             for line in inpdb:
                 if line.startswith(("ATOM", "HETATM")):
                     resname = line[17:20].strip()
@@ -255,12 +255,14 @@ class ProteinLigandComplex:
             if as_numpy_array:
                 self.atom_contact_pairs = np.array(self.atom_contact_pairs)
 
-    def find_active_site_residue(self, *, dist_cut: float = 6.0) -> list[bool]:
+    def find_active_site_residue(
+        self, *, active_site_dist_cut: float = 6.0
+    ) -> list[bool]:
         """
         Find active site residues surrounding bound ligands.
 
         Args:
-            dist_cut: distance threshoold for contacting residues.
+            active_site_dist_cut: distance threshoold for contacting residues.
         """
         receptor_all_residues = self.receptor_obj.get_residues()
 
@@ -281,7 +283,7 @@ class ProteinLigandComplex:
 
                             inter_atom_dist = np.linalg.norm(latm_crd - patm_crd)
                             # check inter-atomic distance
-                            if inter_atom_dist <= dist_cut:
+                            if inter_atom_dist <= active_site_dist_cut:
                                 this_residue_contacted = True
                                 break
                         if this_residue_contacted:
@@ -359,7 +361,7 @@ class ProteinLigandComplex:
 if __name__ == "__main__":
     # test code
     complex_name = "test.pdb"
-    complex_obj = ProteinLigandComplex(inpdb=complex_name)
+    complex_obj = ProteinLigandComplex(infile=complex_name)
     # TODO: test ProteinLigandComplex class works properly
     complex_obj.find_protein_ligand_contact_atom_pairs()
     for pair in complex_obj.get_atomic_contact_pairs():

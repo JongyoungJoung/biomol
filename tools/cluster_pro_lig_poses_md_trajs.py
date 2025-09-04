@@ -951,7 +951,7 @@ def main():
     # NOTE: loading initial pdb file
     # if not exist, loading ./prep/*_initial_solv.pdb by converting it into desolvated pdb
     input_pdb, num_atoms = check_existance_or_load_default(inpdb=args.inpdb)
-    pl_complex = PL_Com(inpdb=input_pdb)
+    pl_complex = PL_Com(infile=input_pdb)
 
     print(f"2. Extracting Geometric Features from Initial Structure: {args.inpdb}")
     # NOTE: Get geometry features

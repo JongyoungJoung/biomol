@@ -251,10 +251,10 @@ def parse_args():
     target_system_opt.add_argument(
         "-wb",
         "--water-box-size",
-        dest="water_box_residual",
+        dest="water_box_size",
         type=float,
         default=15.0,
-        help="Water box size. Distance from surface of system to box boundary",
+        help="Water box size. Distance from surface of system to box boundary (Angstrom)",
     )
 
     return parser
