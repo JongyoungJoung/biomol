@@ -146,6 +146,7 @@ class Protein:
             # type(chids) is list
             return [c.upper() for c in chids]
 
+    # NOTE: static method for residue handling
     @staticmethod
     def get_atomic_crds_of_residue(residue: Residue.Residue) -> list:
         res_crds = []
@@ -188,6 +189,28 @@ class Protein:
             res_charge -= 1.0
 
         return res_charge
+
+    # # NOTE: static methods for atom handling
+    # @staticmethod
+    # def get_atom_name(*, atom: Atom.Atom) -> str:
+    #     """
+    #     Get atom's name.
+    #     """
+    #     return atom.get_name()
+    #
+    # @staticmethod
+    # def get_atom_serial_id(*, atom: Atom.Atom) -> int:
+    #     """
+    #     Get atom's serial id.
+    #     """
+    #     return atom.get_serial_number()
+
+    @staticmethod
+    def get_atom_coord(*, atom: Atom.Atom) -> npt.NDArray:
+        """
+        Get atom's coordinates as numpy array.
+        """
+        return atom.get_coord()
 
     def get_num_atoms(self) -> int:
         return self.num_atoms

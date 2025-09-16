@@ -158,7 +158,7 @@ class ProteinLigandComplex:
             if verbose:
                 raise UserWarning(f"{self.ligand_pdbname} does not exist. No ligands")
 
-    def get_non_amino_acid_ligands(self) -> int:
+    def get_num_of_non_amino_acid_ligands(self) -> int:
         """
         Return number of non-water & non-atmino acid molecules.
         """
@@ -256,13 +256,18 @@ class ProteinLigandComplex:
                 self.atom_contact_pairs = np.array(self.atom_contact_pairs)
 
     def find_active_site_residue(
-        self, *, active_site_dist_cut: float = 6.0
+        self,
+        *,
+        active_site_distance_cut: float = 6.0,
     ) -> list[bool]:
         """
         Find active site residues surrounding bound ligands.
 
         Args:
             active_site_dist_cut: distance threshoold for contacting residues.
+
+        Returns:
+            (bool) list of selected "residues" for active site residues
         """
         receptor_all_residues = self.receptor_obj.get_residues()
 
@@ -280,12 +285,12 @@ class ProteinLigandComplex:
                             latm_crd = self.ligand_obj.get_ith_atom_crd(atom_id=latm_id)
                             # NOTE: pres_id : positional index to check out
                             #                 whether this residues are contacted with ligands
-
                             inter_atom_dist = np.linalg.norm(latm_crd - patm_crd)
                             # check inter-atomic distance
-                            if inter_atom_dist <= active_site_dist_cut:
+                            if inter_atom_dist <= active_site_distance_cut:
                                 this_residue_contacted = True
                                 break
+
                         if this_residue_contacted:
                             break
                     # NOTE:
