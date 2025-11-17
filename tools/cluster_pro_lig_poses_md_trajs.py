@@ -22,8 +22,6 @@ from tqdm import tqdm
 from biomol.protein import Protein as biomol_protein
 from biomol.protein_ligand_complex import ProteinLigandComplex as PL_Com
 
-# import mdshare
-
 
 def check_existance_or_load_default(
     *, inpdb: str | None = None, intop: str | None = None
@@ -968,7 +966,8 @@ def main():
         num_crd_per_traj=args.num_crd_per_traj,
     )
 
-    print("4. Generate PyEMMA Featurizer")
+    # print("4. Generate PyEMMA Featurizer")
+    print("4. Generate Markov Model Featurizer")
     # NOTE: Featurizers of each feature type
     featurizers = create_featurizers(
         topfile=args.topology,
