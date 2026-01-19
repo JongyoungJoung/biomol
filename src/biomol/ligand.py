@@ -40,6 +40,8 @@ class Ligand:
         # self.find_rotatable_bonds()
 
     def loadpdb(self, *, infile: str, add_h: bool = False):
+        # NOTE: rdkit utilizing part ->
+        # atom coord, atomic charges
         # 1. Load PDB with connectivity
         mol = Chem.MolFromPDBFile(infile, removeHs=False, sanitize=False)  # type: ignore
         # 2. Sanitize manually to assign bond order
@@ -49,6 +51,7 @@ class Ligand:
         # NOTE: self.mol : main objects
         self.mol = Chem.Mol(mol)  # pyright: ignore[reportAttributeAccessIssue]
 
+        # NOTE: biopython utilizing part ->
         # for getting atomic index written in pdb
         parser = PDBParser(QUIET=True)
         structure = parser.get_structure("ligand", infile)
